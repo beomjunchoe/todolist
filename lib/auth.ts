@@ -39,12 +39,24 @@ export function getAdminKakaoIds() {
     .filter(Boolean);
 }
 
-export function isAdminUser(user: { kakaoId: string } | null | undefined) {
+export function getAdminUserIds() {
+  return (process.env.ADMIN_USER_IDS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+export function isAdminUser(
+  user: { kakaoId: string; id: string } | null | undefined,
+) {
   if (!user) {
     return false;
   }
 
-  return getAdminKakaoIds().includes(user.kakaoId);
+  return (
+    getAdminKakaoIds().includes(user.kakaoId) ||
+    getAdminUserIds().includes(user.id)
+  );
 }
 
 export async function createSessionRecord(userId: string) {
