@@ -1,5 +1,5 @@
 import { type BoardTodoRecord, type TodoWithChecksRecord } from "@/lib/db";
-import { type WeekDay } from "@/lib/week";
+import { getWeekStartKey, type WeekDay } from "@/lib/week";
 
 export function isTodoCompletedForWeek(
   todo: TodoWithChecksRecord,
@@ -11,9 +11,35 @@ export function isTodoCompletedForWeek(
 
 export function countCompletedTodos(
   todos: TodoWithChecksRecord[],
-  week: WeekDay[],
 ) {
-  return todos.filter((todo) => isTodoCompletedForWeek(todo, week)).length;
+  return todos.reduce((total, todo) => total + todo.starCount, 0);
+}
+
+export function countStarsByTodo(allChecksByTodo: Map<string, string[]>) {
+  const starCounts = new Map<string, number>();
+
+  for (const [todoId, dateKeys] of allChecksByTodo.entries()) {
+    const checksByWeek = new Map<string, Set<string>>();
+
+    for (const dateKey of dateKeys) {
+      const weekStartKey = getWeekStartKey(dateKey);
+      const weekChecks = checksByWeek.get(weekStartKey) ?? new Set<string>();
+      weekChecks.add(dateKey);
+      checksByWeek.set(weekStartKey, weekChecks);
+    }
+
+    let starCount = 0;
+
+    for (const weekChecks of checksByWeek.values()) {
+      if (weekChecks.size === 7) {
+        starCount += 1;
+      }
+    }
+
+    starCounts.set(todoId, starCount);
+  }
+
+  return starCounts;
 }
 
 export function groupBoardTodos(boardTodos: BoardTodoRecord[]) {
@@ -44,14 +70,14 @@ export function groupBoardTodos(boardTodos: BoardTodoRecord[]) {
 
 export function buildScoreboard(
   groups: ReturnType<typeof groupBoardTodos>,
-  week: WeekDay[],
+  userStarTotals: Map<string, number>,
   currentUserId: string | null,
 ) {
   return [...groups]
     .map((group) => ({
       userId: group.userId,
       nickname: group.nickname,
-      stars: countCompletedTodos(group.todos, week),
+      stars: userStarTotals.get(group.userId) ?? 0,
       todoCount: group.todos.length,
       isMine: group.userId === currentUserId,
     }))

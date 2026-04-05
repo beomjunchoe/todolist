@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 
 import Database from "better-sqlite3";
+import { countStarsByTodo } from "@/lib/todo-helpers";
 
 export type DbUser = {
   id: string;
@@ -16,6 +17,7 @@ export type DbUser = {
 export type TodoWithChecksRecord = {
   id: string;
   isContentPublic: boolean;
+  starCount: number;
   title: string;
   userId: string;
   checks: { dateKey: string }[];
@@ -93,6 +95,7 @@ function createDatabase() {
       user_id TEXT NOT NULL,
       title TEXT NOT NULL,
       is_public INTEGER NOT NULL DEFAULT 0,
+      completed_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -111,6 +114,14 @@ function createDatabase() {
     CREATE INDEX IF NOT EXISTS idx_todo_items_user_id_created_at ON todo_items(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_todo_checks_date_key ON todo_checks(date_key);
   `);
+
+  const todoItemColumns = db
+    .prepare("PRAGMA table_info(todo_items)")
+    .all() as { name: string }[];
+
+  if (!todoItemColumns.some((column) => column.name === "completed_at")) {
+    db.exec("ALTER TABLE todo_items ADD COLUMN completed_at TEXT");
+  }
 
   return db;
 }
@@ -329,6 +340,18 @@ export function deleteTodoItemById(todoId: string) {
   ).run(todoId);
 }
 
+export function completeTodoItemForUser(userId: string, todoId: string) {
+  const db = getDatabase();
+
+  db.prepare(
+    `
+      UPDATE todo_items
+      SET completed_at = ?, updated_at = ?
+      WHERE id = ? AND user_id = ? AND completed_at IS NULL
+    `,
+  ).run(new Date().toISOString(), new Date().toISOString(), todoId, userId);
+}
+
 export function toggleTodoVisibilityForUser(userId: string, todoId: string) {
   const db = getDatabase();
   const todo = db
@@ -423,6 +446,27 @@ function listChecksByTodo(weekKeys: string[]) {
   return checksByTodo;
 }
 
+function listAllCheckDateKeysByTodo() {
+  const db = getDatabase();
+  const checks = db.prepare(
+    `
+      SELECT todo_id, date_key
+      FROM todo_checks
+      ORDER BY date_key ASC
+    `,
+  ).all() as { todo_id: string; date_key: string }[];
+
+  const checksByTodo = new Map<string, string[]>();
+
+  for (const check of checks) {
+    const group = checksByTodo.get(check.todo_id) ?? [];
+    group.push(check.date_key);
+    checksByTodo.set(check.todo_id, group);
+  }
+
+  return checksByTodo;
+}
+
 function mapTodoRow(
   todo: {
     id: string;
@@ -431,10 +475,12 @@ function mapTodoRow(
     is_public: number;
   },
   checksByTodo: Map<string, { dateKey: string }[]>,
+  starCountsByTodo: Map<string, number>,
 ): TodoWithChecksRecord {
   return {
     id: todo.id,
     isContentPublic: Boolean(todo.is_public),
+    starCount: starCountsByTodo.get(todo.id) ?? 0,
     title: todo.title,
     userId: todo.user_id,
     checks: checksByTodo.get(todo.id) ?? [],
@@ -448,7 +494,7 @@ export function listTodosForUser(userId: string, weekKeys: string[]): TodoWithCh
       `
         SELECT id, user_id, title, is_public
         FROM todo_items
-        WHERE user_id = ?
+        WHERE user_id = ? AND completed_at IS NULL
         ORDER BY created_at ASC
       `,
     )
@@ -460,8 +506,10 @@ export function listTodosForUser(userId: string, weekKeys: string[]): TodoWithCh
   }[];
 
   const checksByTodo = listChecksByTodo(weekKeys);
+  const allChecksByTodo = listAllCheckDateKeysByTodo();
+  const starCountsByTodo = countStarsByTodo(allChecksByTodo);
 
-  return todos.map((todo) => mapTodoRow(todo, checksByTodo));
+  return todos.map((todo) => mapTodoRow(todo, checksByTodo, starCountsByTodo));
 }
 
 export function listBoardTodos(weekKeys: string[]): BoardTodoRecord[] {
@@ -478,6 +526,7 @@ export function listBoardTodos(weekKeys: string[]): BoardTodoRecord[] {
           users.profile_image
         FROM todo_items
         INNER JOIN users ON users.id = todo_items.user_id
+        WHERE todo_items.completed_at IS NULL
         ORDER BY users.nickname ASC, todo_items.created_at ASC
       `,
     )
@@ -491,12 +540,45 @@ export function listBoardTodos(weekKeys: string[]): BoardTodoRecord[] {
   }[];
 
   const checksByTodo = listChecksByTodo(weekKeys);
+  const allChecksByTodo = listAllCheckDateKeysByTodo();
+  const starCountsByTodo = countStarsByTodo(allChecksByTodo);
 
   return todos.map((todo) => ({
-    ...mapTodoRow(todo, checksByTodo),
+    ...mapTodoRow(todo, checksByTodo, starCountsByTodo),
     user: {
       nickname: todo.nickname,
       profileImage: todo.profile_image,
     },
   }));
+}
+
+export function listUserStarTotals() {
+  const db = getDatabase();
+  const todos = db
+    .prepare(
+      `
+        SELECT id, user_id, completed_at
+        FROM todo_items
+      `,
+    )
+    .all() as {
+    id: string;
+    user_id: string;
+    completed_at: string | null;
+  }[];
+
+  const allChecksByTodo = listAllCheckDateKeysByTodo();
+  const starCountsByTodo = countStarsByTodo(allChecksByTodo);
+  const userStarTotals = new Map<string, number>();
+
+  for (const todo of todos) {
+    const total =
+      (userStarTotals.get(todo.user_id) ?? 0) +
+      (starCountsByTodo.get(todo.id) ?? 0) +
+      (todo.completed_at ? 1 : 0);
+
+    userStarTotals.set(todo.user_id, total);
+  }
+
+  return userStarTotals;
 }

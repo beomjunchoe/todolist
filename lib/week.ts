@@ -32,6 +32,11 @@ function createStableDate(year: number, month: number, day: number) {
   return new Date(Date.UTC(year, month, day, 12, 0, 0));
 }
 
+function parseDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return createStableDate(year, month - 1, day);
+}
+
 export function getDateKey(date: Date) {
   const parts = toSeoulDateParts(date);
   const month = `${parts.month + 1}`.padStart(2, "0");
@@ -74,4 +79,11 @@ export function formatWeekRange(week: WeekDay[]) {
 
 export function formatWeekColumnLabel(day: WeekDay) {
   return `${day.monthNumber}/${day.dayNumber}(${day.shortLabel})`;
+}
+
+export function getWeekStartKey(dateKey: string) {
+  const date = parseDateKey(dateKey);
+  const parts = toSeoulDateParts(date);
+  const sunday = createStableDate(parts.year, parts.month, parts.day - parts.weekday);
+  return getDateKey(sunday);
 }

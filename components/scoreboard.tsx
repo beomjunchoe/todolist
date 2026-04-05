@@ -1,18 +1,17 @@
 import { buildScoreboard, groupBoardTodos } from "@/lib/todo-helpers";
-import { type WeekDay } from "@/lib/week";
 
 import { StarBadge } from "./badges";
 
 export function Scoreboard({
   currentUserId,
   groups,
-  week,
+  userStarTotals,
 }: {
   currentUserId: string | null;
   groups: ReturnType<typeof groupBoardTodos>;
-  week: WeekDay[];
+  userStarTotals: Map<string, number>;
 }) {
-  const scoreboard = buildScoreboard(groups, week, currentUserId);
+  const scoreboard = buildScoreboard(groups, userStarTotals, currentUserId);
 
   return (
     <section className="glass-panel rounded-[28px] p-5">
@@ -21,14 +20,14 @@ export function Scoreboard({
           <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
             스코어보드
           </p>
-          <h2 className="display-font mt-1 text-xl font-bold">이번 주 별 집계</h2>
+          <h2 className="display-font mt-1 text-xl font-bold">누적 별 집계</h2>
         </div>
         <p className="text-[11px] leading-5 text-[var(--muted)]">
-          할 일 하나를 일주일 내내 완료하면 별 1개
+          할 일 하나를 한 주 동안 모두 완료할 때마다 별 1개
         </p>
       </div>
 
-      <div className="mt-4 max-h-[250px] space-y-3 overflow-y-auto pr-1 sm:grid sm:max-h-none sm:gap-3 sm:space-y-0 sm:overflow-visible sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 max-h-[232px] space-y-3 overflow-y-auto pr-1 sm:grid sm:max-h-none sm:grid-cols-2 sm:gap-3 sm:space-y-0 sm:overflow-visible xl:grid-cols-3">
         {scoreboard.map((entry, index) => (
           <div
             key={entry.userId}
@@ -49,7 +48,7 @@ export function Scoreboard({
                     ) : null}
                   </div>
                   <p className="text-[11px] text-[var(--muted)]">
-                    총 {entry.todoCount}개 중 {entry.stars}개 주간 완료
+                    총 {entry.todoCount}개 할 일, 누적 별 {entry.stars}개
                   </p>
                 </div>
               </div>

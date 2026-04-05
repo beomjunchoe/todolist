@@ -1,25 +1,19 @@
-import { deleteTodo, updateTodo } from "@/app/actions";
+import { completeTodo, deleteTodo, updateTodo } from "@/app/actions";
 import { type TodoWithChecksRecord } from "@/lib/db";
-import { isTodoCompletedForWeek } from "@/lib/todo-helpers";
-import { type WeekDay } from "@/lib/week";
 
 import { StarBadge } from "./badges";
 
 export function SidebarTodoItem({
   todo,
-  week,
 }: {
   todo: TodoWithChecksRecord;
-  week: WeekDay[];
 }) {
-  const completedThisWeek = isTodoCompletedForWeek(todo, week);
-
   return (
     <article className="rounded-3xl border border-[var(--line)] bg-white/80 p-4">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-semibold text-[var(--muted)]">내 할 일</span>
-          {completedThisWeek ? <StarBadge count={1} /> : null}
+          {todo.starCount > 0 ? <StarBadge count={todo.starCount} /> : null}
         </div>
         <form action={updateTodo} className="space-y-3">
           <input name="todoId" type="hidden" value={todo.id} />
@@ -50,11 +44,23 @@ export function SidebarTodoItem({
 
         <form action={deleteTodo}>
           <input name="todoId" type="hidden" value={todo.id} />
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
+              type="submit"
+            >
+              삭제
+            </button>
+          </div>
+        </form>
+
+        <form action={completeTodo}>
+          <input name="todoId" type="hidden" value={todo.id} />
           <button
-            className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
+            className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white"
             type="submit"
           >
-            삭제
+            최종 완료
           </button>
         </form>
       </div>

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentUser, isAdminUser, signOutCurrentSession } from "@/lib/auth";
 import {
+  completeTodoItemForUser,
   createTodoItem,
   deleteTodoItemById,
   deleteTodoItemForUser,
@@ -79,6 +80,18 @@ export async function deleteTodo(formData: FormData) {
   }
 
   deleteTodoItemForUser(user.id, todoId);
+  revalidatePath("/");
+}
+
+export async function completeTodo(formData: FormData) {
+  const user = await requireSignedInUser();
+  const todoId = `${formData.get("todoId") ?? ""}`;
+
+  if (!todoId) {
+    return;
+  }
+
+  completeTodoItemForUser(user.id, todoId);
   revalidatePath("/");
 }
 

@@ -1,8 +1,6 @@
 import { deleteTodoAsAdmin } from "@/app/actions";
 import {
-  countCompletedTodos,
   groupBoardTodos,
-  isTodoCompletedForWeek,
 } from "@/lib/todo-helpers";
 import { formatWeekColumnLabel, type WeekDay } from "@/lib/week";
 
@@ -27,11 +25,13 @@ export function BoardTable({
   currentUserIsAdmin,
   currentUserId,
   groups,
+  userStarTotals,
   week,
 }: {
   currentUserIsAdmin: boolean;
   currentUserId: string | null;
   groups: ReturnType<typeof groupBoardTodos>;
+  userStarTotals: Map<string, number>;
   week: WeekDay[];
 }) {
   if (groups.length === 0) {
@@ -57,7 +57,7 @@ export function BoardTable({
       <div className="lg:hidden space-y-3 p-4">
         {groups.map((group) => {
           const isMine = group.userId === currentUserId;
-          const completedCount = countCompletedTodos(group.todos, week);
+          const completedCount = userStarTotals.get(group.userId) ?? 0;
 
           return (
             <section
@@ -102,7 +102,7 @@ export function BoardTable({
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          {isTodoCompletedForWeek(todo, week) ? <StarBadge count={1} /> : null}
+                          {todo.starCount > 0 ? <StarBadge count={todo.starCount} /> : null}
                           {currentUserIsAdmin && !isMine ? (
                             <AdminDeleteButton todoId={todo.id} />
                           ) : null}
@@ -116,7 +116,15 @@ export function BoardTable({
                             className="rounded-2xl border border-[var(--line)] bg-white/90 px-1 py-2"
                           >
                             <div
-                              className={`mb-1 text-center text-[9px] font-semibold leading-4 ${day.isToday ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}
+                              className={`mb-1 whitespace-nowrap text-center text-[8px] font-semibold leading-4 ${
+                                day.weekdayNumber === 0
+                                  ? "text-[var(--accent)]"
+                                  : day.weekdayNumber === 6
+                                    ? "text-[var(--sky)]"
+                                    : day.isToday
+                                      ? "text-[var(--accent)]"
+                                      : "text-[var(--muted)]"
+                              }`}
                             >
                               {day.dayNumber}/{day.shortLabel}
                             </div>
@@ -155,7 +163,17 @@ export function BoardTable({
                   key={day.dateKey}
                   className="border-b border-[var(--line)] px-2 py-3 text-center text-xs font-semibold"
                 >
-                  <div className={day.isToday ? "text-[var(--accent)]" : ""}>
+                  <div
+                    className={
+                      day.weekdayNumber === 0
+                        ? "text-[var(--accent)]"
+                        : day.weekdayNumber === 6
+                          ? "text-[var(--sky)]"
+                          : day.isToday
+                            ? "text-[var(--accent)]"
+                            : ""
+                    }
+                  >
                     {formatWeekColumnLabel(day)}
                   </div>
                 </th>
@@ -185,8 +203,8 @@ export function BoardTable({
                           <div>
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-semibold">{group.nickname}</p>
-                              {countCompletedTodos(group.todos, week) > 0 ? (
-                                <StarBadge count={countCompletedTodos(group.todos, week)} />
+                              {(userStarTotals.get(group.userId) ?? 0) > 0 ? (
+                                <StarBadge count={userStarTotals.get(group.userId) ?? 0} />
                               ) : null}
                               {isMine ? (
                                 <span className="rounded-full bg-[var(--foreground)] px-2 py-1 text-[10px] font-semibold text-white">
@@ -218,7 +236,7 @@ export function BoardTable({
                     {week.map((day) => (
                       <td
                         key={`${todo.id}-${day.dateKey}`}
-                        className="border-b border-[var(--line)] px-2 py-3"
+                        className="border-b border-[var(--line)] px-2 py-2"
                       >
                         <CheckCell
                           checked={checkDates.has(day.dateKey)}

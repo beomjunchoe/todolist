@@ -1,7 +1,5 @@
 import { createTodo, signOut } from "@/app/actions";
 import { type TodoWithChecksRecord } from "@/lib/db";
-import { countCompletedTodos } from "@/lib/todo-helpers";
-import { type WeekDay } from "@/lib/week";
 import { InstallShortcut } from "./install-shortcut";
 
 import { AdminBadge, StarBadge } from "./badges";
@@ -10,15 +8,15 @@ import { SidebarTodoItem } from "./sidebar-todo-item";
 export function Sidebar({
   currentUserName,
   isAdmin,
+  totalStars,
   myTodos,
-  week,
 }: {
   currentUserName: string;
   isAdmin: boolean;
+  totalStars: number;
   myTodos: TodoWithChecksRecord[];
-  week: WeekDay[];
 }) {
-  const completedCount = countCompletedTodos(myTodos, week);
+  const completedCount = totalStars;
 
   return (
     <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
@@ -86,9 +84,7 @@ export function Sidebar({
         </div>
         <div className="mt-3 space-y-3">
           {myTodos.length > 0 ? (
-            myTodos.map((todo) => (
-              <SidebarTodoItem key={todo.id} todo={todo} week={week} />
-            ))
+            myTodos.map((todo) => <SidebarTodoItem key={todo.id} todo={todo} />)
           ) : (
             <p className="text-xs leading-6 text-[var(--muted)]">
               아직 등록된 할 일이 없습니다. 위에서 하나 추가해 보세요.

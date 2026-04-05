@@ -1,5 +1,5 @@
 import { getCurrentUser, isAdminUser, isKakaoConfigured } from "@/lib/auth";
-import { listBoardTodos, listTodosForUser } from "@/lib/db";
+import { listBoardTodos, listTodosForUser, listUserStarTotals } from "@/lib/db";
 import { groupBoardTodos } from "@/lib/todo-helpers";
 import { formatWeekRange, getCurrentWeek } from "@/lib/week";
 import { AdminBadge } from "@/components/badges";
@@ -47,6 +47,7 @@ export default async function Home({ searchParams }: PageProps) {
   const currentUser = await getCurrentUser();
   const currentUserIsAdmin = isAdminUser(currentUser);
   const boardTodos = listBoardTodos(weekKeys);
+  const userStarTotals = listUserStarTotals();
   const groups = groupBoardTodos(boardTodos);
   const myTodos = currentUser ? listTodosForUser(currentUser.id, weekKeys) : [];
   const kakaoConfigured = isKakaoConfigured();
@@ -123,8 +124,8 @@ export default async function Home({ searchParams }: PageProps) {
               <Sidebar
                 currentUserName={currentUser.nickname}
                 isAdmin={currentUserIsAdmin}
+                totalStars={userStarTotals.get(currentUser.id) ?? 0}
                 myTodos={myTodos}
-                week={week}
               />
             ) : (
               <aside className="glass-panel rounded-[28px] p-5 lg:sticky lg:top-6 lg:self-start">
@@ -147,11 +148,16 @@ export default async function Home({ searchParams }: PageProps) {
           </div>
 
           <div className="order-1 space-y-4 min-w-0 lg:order-2 lg:space-y-5">
-            <Scoreboard currentUserId={currentUser?.id ?? null} groups={groups} week={week} />
+            <Scoreboard
+              currentUserId={currentUser?.id ?? null}
+              groups={groups}
+              userStarTotals={userStarTotals}
+            />
             <BoardTable
               currentUserId={currentUser?.id ?? null}
               currentUserIsAdmin={currentUserIsAdmin}
               groups={groups}
+              userStarTotals={userStarTotals}
               week={week}
             />
           </div>
