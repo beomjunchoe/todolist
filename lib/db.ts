@@ -15,13 +15,13 @@ export type DbUser = {
 
 export type TodoWithChecksRecord = {
   id: string;
-  isPublic: boolean;
+  isContentPublic: boolean;
   title: string;
   userId: string;
   checks: { dateKey: string }[];
 };
 
-export type PublicTodoRecord = TodoWithChecksRecord & {
+export type BoardTodoRecord = TodoWithChecksRecord & {
   user: Pick<DbUser, "nickname" | "profileImage">;
 };
 
@@ -264,7 +264,7 @@ export function upsertUserByKakao(input: {
 export function createTodoItem(input: {
   userId: string;
   title: string;
-  isPublic: boolean;
+  isContentPublic: boolean;
 }) {
   const db = getDatabase();
   const now = new Date().toISOString();
@@ -278,10 +278,44 @@ export function createTodoItem(input: {
     randomUUID(),
     input.userId,
     input.title,
-    input.isPublic ? 1 : 0,
+    input.isContentPublic ? 1 : 0,
     now,
     now,
   );
+}
+
+export function updateTodoItemForUser(input: {
+  userId: string;
+  todoId: string;
+  title: string;
+  isContentPublic: boolean;
+}) {
+  const db = getDatabase();
+
+  db.prepare(
+    `
+      UPDATE todo_items
+      SET title = ?, is_public = ?, updated_at = ?
+      WHERE id = ? AND user_id = ?
+    `,
+  ).run(
+    input.title,
+    input.isContentPublic ? 1 : 0,
+    new Date().toISOString(),
+    input.todoId,
+    input.userId,
+  );
+}
+
+export function deleteTodoItemForUser(userId: string, todoId: string) {
+  const db = getDatabase();
+
+  db.prepare(
+    `
+      DELETE FROM todo_items
+      WHERE id = ? AND user_id = ?
+    `,
+  ).run(todoId, userId);
 }
 
 export function toggleTodoVisibilityForUser(userId: string, todoId: string) {
@@ -353,6 +387,49 @@ export function toggleTodoCheckForUser(userId: string, todoId: string, dateKey: 
   ).run(randomUUID(), todoId, dateKey, new Date().toISOString());
 }
 
+function listChecksByTodo(weekKeys: string[]) {
+  const db = getDatabase();
+  const checks = weekKeys.length
+    ? (db
+        .prepare(
+          `
+            SELECT todo_id, date_key
+            FROM todo_checks
+            WHERE date_key IN (${weekKeys.map(() => "?").join(", ")})
+          `,
+        )
+        .all(...weekKeys) as { todo_id: string; date_key: string }[])
+    : [];
+
+  const checksByTodo = new Map<string, { dateKey: string }[]>();
+
+  for (const check of checks) {
+    const group = checksByTodo.get(check.todo_id) ?? [];
+    group.push({ dateKey: check.date_key });
+    checksByTodo.set(check.todo_id, group);
+  }
+
+  return checksByTodo;
+}
+
+function mapTodoRow(
+  todo: {
+    id: string;
+    user_id: string;
+    title: string;
+    is_public: number;
+  },
+  checksByTodo: Map<string, { dateKey: string }[]>,
+): TodoWithChecksRecord {
+  return {
+    id: todo.id,
+    isContentPublic: Boolean(todo.is_public),
+    title: todo.title,
+    userId: todo.user_id,
+    checks: checksByTodo.get(todo.id) ?? [],
+  };
+}
+
 export function listTodosForUser(userId: string, weekKeys: string[]): TodoWithChecksRecord[] {
   const db = getDatabase();
   const todos = db
@@ -371,36 +448,12 @@ export function listTodosForUser(userId: string, weekKeys: string[]): TodoWithCh
     is_public: number;
   }[];
 
-  const checks = weekKeys.length
-    ? (db
-        .prepare(
-          `
-            SELECT todo_id, date_key
-            FROM todo_checks
-            WHERE date_key IN (${weekKeys.map(() => "?").join(", ")})
-          `,
-        )
-        .all(...weekKeys) as { todo_id: string; date_key: string }[])
-    : [];
+  const checksByTodo = listChecksByTodo(weekKeys);
 
-  const checksByTodo = new Map<string, { dateKey: string }[]>();
-
-  for (const check of checks) {
-    const group = checksByTodo.get(check.todo_id) ?? [];
-    group.push({ dateKey: check.date_key });
-    checksByTodo.set(check.todo_id, group);
-  }
-
-  return todos.map((todo) => ({
-    id: todo.id,
-    isPublic: Boolean(todo.is_public),
-    title: todo.title,
-    userId: todo.user_id,
-    checks: checksByTodo.get(todo.id) ?? [],
-  }));
+  return todos.map((todo) => mapTodoRow(todo, checksByTodo));
 }
 
-export function listPublicTodos(weekKeys: string[]): PublicTodoRecord[] {
+export function listBoardTodos(weekKeys: string[]): BoardTodoRecord[] {
   const db = getDatabase();
   const todos = db
     .prepare(
@@ -414,8 +467,7 @@ export function listPublicTodos(weekKeys: string[]): PublicTodoRecord[] {
           users.profile_image
         FROM todo_items
         INNER JOIN users ON users.id = todo_items.user_id
-        WHERE todo_items.is_public = 1
-        ORDER BY todo_items.created_at ASC
+        ORDER BY users.nickname ASC, todo_items.created_at ASC
       `,
     )
     .all() as {
@@ -427,32 +479,10 @@ export function listPublicTodos(weekKeys: string[]): PublicTodoRecord[] {
     profile_image: string | null;
   }[];
 
-  const checks = weekKeys.length
-    ? (db
-        .prepare(
-          `
-            SELECT todo_id, date_key
-            FROM todo_checks
-            WHERE date_key IN (${weekKeys.map(() => "?").join(", ")})
-          `,
-        )
-        .all(...weekKeys) as { todo_id: string; date_key: string }[])
-    : [];
-
-  const checksByTodo = new Map<string, { dateKey: string }[]>();
-
-  for (const check of checks) {
-    const group = checksByTodo.get(check.todo_id) ?? [];
-    group.push({ dateKey: check.date_key });
-    checksByTodo.set(check.todo_id, group);
-  }
+  const checksByTodo = listChecksByTodo(weekKeys);
 
   return todos.map((todo) => ({
-    id: todo.id,
-    isPublic: Boolean(todo.is_public),
-    title: todo.title,
-    userId: todo.user_id,
-    checks: checksByTodo.get(todo.id) ?? [],
+    ...mapTodoRow(todo, checksByTodo),
     user: {
       nickname: todo.nickname,
       profileImage: todo.profile_image,

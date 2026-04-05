@@ -1,5 +1,5 @@
 const SEOUL_OFFSET_HOURS = 9;
-const DAY_NAMES = ["월", "화", "수", "목", "금", "토", "일"];
+const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
 type SeoulDateParts = {
   year: number;
@@ -12,6 +12,8 @@ export type WeekDay = {
   dateKey: string;
   shortLabel: string;
   dayNumber: number;
+  monthNumber: number;
+  weekdayNumber: number;
   isToday: boolean;
 };
 
@@ -40,22 +42,24 @@ export function getDateKey(date: Date) {
 
 export function getCurrentWeek(date = new Date()): WeekDay[] {
   const today = toSeoulDateParts(date);
-  const mondayOffset = (today.weekday + 6) % 7;
-  const monday = createStableDate(today.year, today.month, today.day - mondayOffset);
+  const startOffset = today.weekday;
+  const sunday = createStableDate(today.year, today.month, today.day - startOffset);
   const todayKey = getDateKey(date);
 
   return Array.from({ length: 7 }, (_, index) => {
     const current = createStableDate(
-      monday.getUTCFullYear(),
-      monday.getUTCMonth(),
-      monday.getUTCDate() + index,
+      sunday.getUTCFullYear(),
+      sunday.getUTCMonth(),
+      sunday.getUTCDate() + index,
     );
     const parts = toSeoulDateParts(current);
 
     return {
       dateKey: getDateKey(current),
-      shortLabel: DAY_NAMES[index],
+      shortLabel: DAY_NAMES[parts.weekday],
       dayNumber: parts.day,
+      monthNumber: parts.month + 1,
+      weekdayNumber: parts.weekday,
       isToday: getDateKey(current) === todayKey,
     };
   });
@@ -65,5 +69,9 @@ export function formatWeekRange(week: WeekDay[]) {
   const first = week[0];
   const last = week[week.length - 1];
 
-  return `${first.dateKey} ~ ${last.dateKey}`;
+  return `${first.monthNumber}/${first.dayNumber}(${first.shortLabel}) ~ ${last.monthNumber}/${last.dayNumber}(${last.shortLabel})`;
+}
+
+export function formatWeekColumnLabel(day: WeekDay) {
+  return `${day.monthNumber}/${day.dayNumber}(${day.shortLabel})`;
 }

@@ -6,8 +6,10 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, signOutCurrentSession } from "@/lib/auth";
 import {
   createTodoItem,
+  deleteTodoItemForUser,
   toggleTodoCheckForUser,
   toggleTodoVisibilityForUser,
+  updateTodoItemForUser,
 } from "@/lib/db";
 
 async function requireSignedInUser() {
@@ -23,14 +25,14 @@ async function requireSignedInUser() {
 export async function createTodo(formData: FormData) {
   const user = await requireSignedInUser();
   const title = `${formData.get("title") ?? ""}`.trim();
-  const isPublic = formData.get("isPublic") === "on";
+  const isContentPublic = formData.get("isContentPublic") === "on";
 
   if (!title) {
     return;
   }
 
   createTodoItem({
-    isPublic,
+    isContentPublic,
     title: title.slice(0, 80),
     userId: user.id,
   });
@@ -43,6 +45,38 @@ export async function toggleTodoVisibility(formData: FormData) {
   const todoId = `${formData.get("todoId") ?? ""}`;
 
   toggleTodoVisibilityForUser(user.id, todoId);
+  revalidatePath("/");
+}
+
+export async function updateTodo(formData: FormData) {
+  const user = await requireSignedInUser();
+  const todoId = `${formData.get("todoId") ?? ""}`;
+  const title = `${formData.get("title") ?? ""}`.trim();
+  const isContentPublic = formData.get("isContentPublic") === "on";
+
+  if (!todoId || !title) {
+    return;
+  }
+
+  updateTodoItemForUser({
+    isContentPublic,
+    title: title.slice(0, 80),
+    todoId,
+    userId: user.id,
+  });
+
+  revalidatePath("/");
+}
+
+export async function deleteTodo(formData: FormData) {
+  const user = await requireSignedInUser();
+  const todoId = `${formData.get("todoId") ?? ""}`;
+
+  if (!todoId) {
+    return;
+  }
+
+  deleteTodoItemForUser(user.id, todoId);
   revalidatePath("/");
 }
 
