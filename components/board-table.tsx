@@ -1,5 +1,4 @@
 import { deleteTodoAsAdmin } from "@/app/actions";
-import { type BoardTodoRecord } from "@/lib/db";
 import {
   countCompletedTodos,
   groupBoardTodos,
@@ -110,24 +109,25 @@ export function BoardTable({
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-4 gap-2">
+                      <div className="mt-3 grid grid-cols-7 gap-1.5">
                         {week.map((day) => (
                           <div
                             key={`${todo.id}-${day.dateKey}`}
-                            className="rounded-2xl border border-[var(--line)] bg-white/90 p-2"
+                            className="rounded-2xl border border-[var(--line)] bg-white/90 px-1 py-2"
                           >
                             <div
-                              className={`mb-2 text-center text-[10px] font-semibold ${day.isToday ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}
+                              className={`mb-1 text-center text-[9px] font-semibold leading-4 ${day.isToday ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}
                             >
-                              {day.dayNumber}
-                              {day.shortLabel}
+                              {day.dayNumber}/{day.shortLabel}
                             </div>
-                            <CheckCell
-                              checked={checkDates.has(day.dateKey)}
-                              dateKey={day.dateKey}
-                              editable={isMine}
-                              todoId={todo.id}
-                            />
+                            <div className="flex justify-center">
+                              <CheckCell
+                                checked={checkDates.has(day.dateKey)}
+                                dateKey={day.dateKey}
+                                editable={isMine}
+                                todoId={todo.id}
+                              />
+                            </div>
                           </div>
                         ))}
                       </div>

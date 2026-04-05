@@ -28,7 +28,7 @@ export function Scoreboard({
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 max-h-[250px] space-y-3 overflow-y-auto pr-1 sm:grid sm:max-h-none sm:gap-3 sm:space-y-0 sm:overflow-visible sm:grid-cols-2 xl:grid-cols-3">
         {scoreboard.map((entry, index) => (
           <div
             key={entry.userId}
