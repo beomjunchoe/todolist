@@ -15,7 +15,7 @@ export function SidebarTodoItem({
           <span className="text-[11px] font-semibold text-[var(--muted)]">내 할 일</span>
           {todo.starCount > 0 ? <StarBadge count={todo.starCount} /> : null}
         </div>
-        <form action={updateTodo} className="space-y-3">
+        <form action={updateTodo} className="space-y-2">
           <input name="todoId" type="hidden" value={todo.id} />
           <input
             className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none"
@@ -34,34 +34,28 @@ export function SidebarTodoItem({
             />
             내용 공개
           </label>
-          <button
-            className="rounded-full bg-[var(--foreground)] px-3 py-2 text-xs font-semibold text-white"
-            type="submit"
-          >
-            수정
-          </button>
-        </form>
-
-        <form action={deleteTodo}>
-          <input name="todoId" type="hidden" value={todo.id} />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              className="rounded-full bg-[var(--foreground)] px-3 py-2 text-xs font-semibold text-white"
+              type="submit"
+            >
+              수정
+            </button>
+            <button
+              className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white"
+              formAction={completeTodo}
+              type="submit"
+            >
+              최종 완료
+            </button>
             <button
               className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
+              formAction={deleteTodo}
               type="submit"
             >
               삭제
             </button>
           </div>
-        </form>
-
-        <form action={completeTodo}>
-          <input name="todoId" type="hidden" value={todo.id} />
-          <button
-            className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white"
-            type="submit"
-          >
-            최종 완료
-          </button>
         </form>
       </div>
     </article>
