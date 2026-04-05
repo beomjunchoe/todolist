@@ -221,15 +221,11 @@ function SidebarTodoItem({
 }
 
 function Sidebar({
-  currentUserId,
-  currentUserKakaoId,
   currentUserName,
   isAdmin,
   myTodos,
   week,
 }: {
-  currentUserId: string;
-  currentUserKakaoId: string;
   currentUserName: string;
   isAdmin: boolean;
   myTodos: TodoWithChecksRecord[];
@@ -265,16 +261,6 @@ function Sidebar({
           왼쪽에서는 할 일을 만들고 수정합니다. 주간 체크는 오른쪽 표에서 내 행만 직접
           누를 수 있습니다.
         </p>
-
-        {!isAdmin ? (
-          <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-3 text-[11px] leading-5 text-[var(--muted)]">
-            관리자 등록용 ID
-            <br />
-            내부 ID: {currentUserId}
-            <br />
-            카카오 ID: {currentUserKakaoId}
-          </div>
-        ) : null}
       </section>
 
       <section className="glass-panel rounded-[28px] p-5">
@@ -692,8 +678,6 @@ export default async function Home({ searchParams }: PageProps) {
           <div className="order-2 lg:order-1">
             {currentUser ? (
               <Sidebar
-                currentUserId={currentUser.id}
-                currentUserKakaoId={currentUser.kakaoId}
                 currentUserName={currentUser.nickname}
                 isAdmin={currentUserIsAdmin}
                 myTodos={myTodos}
