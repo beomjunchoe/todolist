@@ -32,6 +32,21 @@ export function isKakaoConfigured() {
   );
 }
 
+export function getAdminKakaoIds() {
+  return (process.env.ADMIN_KAKAO_IDS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+export function isAdminUser(user: { kakaoId: string } | null | undefined) {
+  if (!user) {
+    return false;
+  }
+
+  return getAdminKakaoIds().includes(user.kakaoId);
+}
+
 export async function createSessionRecord(userId: string) {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);

@@ -24,6 +24,13 @@ DATABASE_URL="file:./dev.db"
 KAKAO_REST_API_KEY=""
 KAKAO_CLIENT_SECRET=""
 KAKAO_REDIRECT_URI="http://localhost:3000/api/auth/kakao/callback"
+ADMIN_KAKAO_IDS=""
+```
+
+`ADMIN_KAKAO_IDS`에는 관리자 카카오 ID를 쉼표로 구분해서 넣습니다. 예:
+
+```bash
+ADMIN_KAKAO_IDS="123456789,987654321"
 ```
 
 ## 카카오 개발자 콘솔 설정

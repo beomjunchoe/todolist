@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getCurrentUser, signOutCurrentSession } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, signOutCurrentSession } from "@/lib/auth";
 import {
   createTodoItem,
+  deleteTodoItemById,
   deleteTodoItemForUser,
   toggleTodoCheckForUser,
   toggleTodoVisibilityForUser,
@@ -16,6 +17,16 @@ async function requireSignedInUser() {
   const user = await getCurrentUser();
 
   if (!user) {
+    redirect("/");
+  }
+
+  return user;
+}
+
+async function requireAdminUser() {
+  const user = await requireSignedInUser();
+
+  if (!isAdminUser(user)) {
     redirect("/");
   }
 
@@ -77,6 +88,18 @@ export async function deleteTodo(formData: FormData) {
   }
 
   deleteTodoItemForUser(user.id, todoId);
+  revalidatePath("/");
+}
+
+export async function deleteTodoAsAdmin(formData: FormData) {
+  await requireAdminUser();
+  const todoId = `${formData.get("todoId") ?? ""}`;
+
+  if (!todoId) {
+    return;
+  }
+
+  deleteTodoItemById(todoId);
   revalidatePath("/");
 }
 

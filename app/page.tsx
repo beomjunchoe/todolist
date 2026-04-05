@@ -1,11 +1,12 @@
 import {
   createTodo,
   deleteTodo,
+  deleteTodoAsAdmin,
   signOut,
   toggleTodoCheck,
   updateTodo,
 } from "@/app/actions";
-import { getCurrentUser, isKakaoConfigured } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, isKakaoConfigured } from "@/lib/auth";
 import {
   listBoardTodos,
   listTodosForUser,
@@ -118,6 +119,14 @@ function StarBadge({ count }: { count: number }) {
   );
 }
 
+function AdminBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-[var(--foreground)] px-2 py-1 text-[10px] font-semibold text-white">
+      관리자
+    </span>
+  );
+}
+
 function CheckCell({
   checked,
   dateKey,
@@ -213,10 +222,12 @@ function SidebarTodoItem({
 
 function Sidebar({
   currentUserName,
+  isAdmin,
   myTodos,
   week,
 }: {
   currentUserName: string;
+  isAdmin: boolean;
   myTodos: TodoWithChecksRecord[];
   week: WeekDay[];
 }) {
@@ -233,6 +244,7 @@ function Sidebar({
             <div className="mt-2 flex items-center gap-2">
               <h2 className="display-font text-xl font-bold">{currentUserName}</h2>
               {completedCount > 0 ? <StarBadge count={completedCount} /> : null}
+              {isAdmin ? <AdminBadge /> : null}
             </div>
           </div>
           <form action={signOut}>
@@ -300,10 +312,12 @@ function Sidebar({
 }
 
 function BoardTable({
+  currentUserIsAdmin,
   currentUserId,
   groups,
   week,
 }: {
+  currentUserIsAdmin: boolean;
   currentUserId: string | null;
   groups: ReturnType<typeof groupBoardTodos>;
   week: WeekDay[];
@@ -378,7 +392,20 @@ function BoardTable({
                             {todo.isContentPublic ? "내용 공개" : "목록은 보이고 내용은 숨김"}
                           </p>
                         </div>
-                        {isTodoCompletedForWeek(todo, week) ? <StarBadge count={1} /> : null}
+                        <div className="flex items-center gap-2">
+                          {isTodoCompletedForWeek(todo, week) ? <StarBadge count={1} /> : null}
+                          {currentUserIsAdmin && !isMine ? (
+                            <form action={deleteTodoAsAdmin}>
+                              <input name="todoId" type="hidden" value={todo.id} />
+                              <button
+                                className="rounded-full border border-[rgba(180,60,40,0.18)] bg-[rgba(255,241,236,0.95)] px-3 py-2 text-[10px] font-semibold text-[#a23b2c]"
+                                type="submit"
+                              >
+                                관리자 삭제
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="mt-3 grid grid-cols-4 gap-2">
@@ -474,11 +501,26 @@ function BoardTable({
                     ) : null}
 
                     <td className="border-b border-[var(--line)] px-4 py-4">
-                      <div className="text-sm font-medium">
-                        {todo.isContentPublic ? todo.title : "비공개 할 일"}
-                      </div>
-                      <div className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
-                        {todo.isContentPublic ? "내용 공개" : "목록은 보이고 내용은 숨김"}
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium">
+                            {todo.isContentPublic ? todo.title : "비공개 할 일"}
+                          </div>
+                          <div className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                            {todo.isContentPublic ? "내용 공개" : "목록은 보이고 내용은 숨김"}
+                          </div>
+                        </div>
+                        {currentUserIsAdmin && !isMine ? (
+                          <form action={deleteTodoAsAdmin}>
+                            <input name="todoId" type="hidden" value={todo.id} />
+                            <button
+                              className="rounded-full border border-[rgba(180,60,40,0.18)] bg-[rgba(255,241,236,0.95)] px-3 py-2 text-[10px] font-semibold text-[#a23b2c]"
+                              type="submit"
+                            >
+                              관리자 삭제
+                            </button>
+                          </form>
+                        ) : null}
                       </div>
                     </td>
 
@@ -570,6 +612,7 @@ export default async function Home({ searchParams }: PageProps) {
   const week = getCurrentWeek();
   const weekKeys = week.map((day) => day.dateKey);
   const currentUser = await getCurrentUser();
+  const currentUserIsAdmin = isAdminUser(currentUser);
   const boardTodos = listBoardTodos(weekKeys);
   const groups = groupBoardTodos(boardTodos);
   const myTodos = currentUser ? listTodosForUser(currentUser.id, weekKeys) : [];
@@ -607,8 +650,9 @@ export default async function Home({ searchParams }: PageProps) {
               </div>
 
               {currentUser ? (
-                <div className="text-xs text-[var(--muted)]">
-                  {currentUser.nickname} 님으로 로그인됨
+                <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                  <span>{currentUser.nickname} 님으로 로그인됨</span>
+                  {currentUserIsAdmin ? <AdminBadge /> : null}
                 </div>
               ) : (
                 <a
@@ -620,6 +664,12 @@ export default async function Home({ searchParams }: PageProps) {
               )}
 
               <InstallShortcut />
+
+              {currentUserIsAdmin ? (
+                <p className="text-[11px] leading-5 text-[var(--muted)]">
+                  관리자 모드: 다른 사람 할 일을 메인 보드에서 삭제할 수 있습니다.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -633,7 +683,12 @@ export default async function Home({ searchParams }: PageProps) {
         <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="order-2 lg:order-1">
             {currentUser ? (
-              <Sidebar currentUserName={currentUser.nickname} myTodos={myTodos} week={week} />
+              <Sidebar
+                currentUserName={currentUser.nickname}
+                isAdmin={currentUserIsAdmin}
+                myTodos={myTodos}
+                week={week}
+              />
             ) : (
               <aside className="glass-panel rounded-[28px] p-5 lg:sticky lg:top-6 lg:self-start">
                 <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
@@ -656,7 +711,12 @@ export default async function Home({ searchParams }: PageProps) {
 
           <div className="order-1 space-y-4 min-w-0 lg:order-2 lg:space-y-5">
             <Scoreboard currentUserId={currentUser?.id ?? null} groups={groups} week={week} />
-            <BoardTable currentUserId={currentUser?.id ?? null} groups={groups} week={week} />
+            <BoardTable
+              currentUserId={currentUser?.id ?? null}
+              currentUserIsAdmin={currentUserIsAdmin}
+              groups={groups}
+              week={week}
+            />
           </div>
         </div>
       </div>

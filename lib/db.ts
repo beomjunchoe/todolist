@@ -318,6 +318,17 @@ export function deleteTodoItemForUser(userId: string, todoId: string) {
   ).run(todoId, userId);
 }
 
+export function deleteTodoItemById(todoId: string) {
+  const db = getDatabase();
+
+  db.prepare(
+    `
+      DELETE FROM todo_items
+      WHERE id = ?
+    `,
+  ).run(todoId);
+}
+
 export function toggleTodoVisibilityForUser(userId: string, todoId: string) {
   const db = getDatabase();
   const todo = db
