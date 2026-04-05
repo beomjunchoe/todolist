@@ -9,7 +9,6 @@ import {
   deleteTodoItemById,
   deleteTodoItemForUser,
   toggleTodoCheckForUser,
-  toggleTodoVisibilityForUser,
   updateTodoItemForUser,
 } from "@/lib/db";
 
@@ -48,14 +47,6 @@ export async function createTodo(formData: FormData) {
     userId: user.id,
   });
 
-  revalidatePath("/");
-}
-
-export async function toggleTodoVisibility(formData: FormData) {
-  const user = await requireSignedInUser();
-  const todoId = `${formData.get("todoId") ?? ""}`;
-
-  toggleTodoVisibilityForUser(user.id, todoId);
   revalidatePath("/");
 }
 
