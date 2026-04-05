@@ -19,6 +19,12 @@ import {
   type WeekDay,
 } from "@/lib/week";
 
+type PageProps = {
+  searchParams?: Promise<{
+    auth?: string | string[];
+  }>;
+};
+
 function getAuthMessage(
   value: string | string[] | undefined,
   kakaoConfigured: boolean,
@@ -26,18 +32,18 @@ function getAuthMessage(
   const authCode = Array.isArray(value) ? value[0] : value;
 
   if (!kakaoConfigured) {
-    return "카카오 앱 설정값이 아직 없습니다. Render 환경변수의 `KAKAO_*` 값을 다시 확인해주세요.";
+    return "카카오 설정값이 아직 없습니다. Render 환경변수의 KAKAO_* 값을 확인해 주세요.";
   }
 
   switch (authCode) {
     case "missing-kakao-config":
       return "카카오 로그인이 아직 설정되지 않았습니다.";
     case "invalid-state":
-      return "로그인 검증에 실패했습니다. 다시 시도해주세요.";
+      return "로그인 검증에 실패했습니다. 다시 시도해 주세요.";
     case "token-exchange-failed":
-      return "카카오 인가 코드를 토큰으로 바꾸는 데 실패했습니다.";
+      return "카카오 인증 코드를 토큰으로 바꾸지 못했습니다.";
     case "profile-fetch-failed":
-      return "카카오 프로필을 불러오지 못했습니다.";
+      return "카카오 프로필 정보를 불러오지 못했습니다.";
     case "kakao-denied":
       return "카카오 로그인 동의가 취소되었습니다.";
     default:
@@ -50,7 +56,6 @@ function groupBoardTodos(boardTodos: BoardTodoRecord[]) {
     string,
     {
       nickname: string;
-      profileImage: string | null;
       todos: BoardTodoRecord[];
     }
   >();
@@ -59,7 +64,6 @@ function groupBoardTodos(boardTodos: BoardTodoRecord[]) {
     if (!grouped.has(todo.userId)) {
       grouped.set(todo.userId, {
         nickname: todo.user.nickname,
-        profileImage: todo.user.profileImage,
         todos: [],
       });
     }
@@ -71,6 +75,46 @@ function groupBoardTodos(boardTodos: BoardTodoRecord[]) {
     userId,
     ...value,
   }));
+}
+
+function isTodoCompletedForWeek(todo: TodoWithChecksRecord, week: WeekDay[]) {
+  const checkedDates = new Set(todo.checks.map((check) => check.dateKey));
+  return week.every((day) => checkedDates.has(day.dateKey));
+}
+
+function countCompletedTodos(todos: TodoWithChecksRecord[], week: WeekDay[]) {
+  return todos.filter((todo) => isTodoCompletedForWeek(todo, week)).length;
+}
+
+function buildScoreboard(
+  groups: ReturnType<typeof groupBoardTodos>,
+  week: WeekDay[],
+  currentUserId: string | null,
+) {
+  return [...groups]
+    .map((group) => ({
+      userId: group.userId,
+      nickname: group.nickname,
+      stars: countCompletedTodos(group.todos, week),
+      todoCount: group.todos.length,
+      isMine: group.userId === currentUserId,
+    }))
+    .sort((left, right) => {
+      if (right.stars !== left.stars) {
+        return right.stars - left.stars;
+      }
+
+      return left.nickname.localeCompare(right.nickname, "ko");
+    });
+}
+
+function StarBadge({ count }: { count: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(255,210,84,0.28)] px-2 py-1 text-[10px] font-semibold text-[var(--foreground)]">
+      <span aria-hidden="true">★</span>
+      {count}
+    </span>
+  );
 }
 
 function CheckCell({
@@ -85,13 +129,17 @@ function CheckCell({
   todoId: string;
 }) {
   const baseClassName =
-    "flex min-h-9 items-center justify-center rounded-xl border px-2 py-2 text-xs font-semibold";
+    "flex min-h-9 items-center justify-center rounded-xl border px-2 py-2 text-[11px] font-semibold";
   const stateClassName = checked
     ? "border-transparent bg-[var(--accent)] text-white shadow-[0_8px_18px_rgba(236,108,47,0.16)]"
-    : "border-[var(--line)] bg-white/90 text-[var(--foreground)]";
+    : "border-[var(--line)] bg-white text-[var(--foreground)]";
 
   if (!editable) {
-    return <div className={`${baseClassName} ${stateClassName}`}>{checked ? "완료" : "-"}</div>;
+    return (
+      <div className={`${baseClassName} ${stateClassName}`}>
+        {checked ? "완료" : "-"}
+      </div>
+    );
   }
 
   return (
@@ -105,46 +153,59 @@ function CheckCell({
   );
 }
 
-function SidebarTodoItem({ todo }: { todo: TodoWithChecksRecord }) {
+function SidebarTodoItem({
+  todo,
+  week,
+}: {
+  todo: TodoWithChecksRecord;
+  week: WeekDay[];
+}) {
+  const completedThisWeek = isTodoCompletedForWeek(todo, week);
+
   return (
-    <article className="rounded-3xl border border-[var(--line)] bg-white/75 p-4">
-      <form action={updateTodo} className="space-y-3">
-        <input name="todoId" type="hidden" value={todo.id} />
-        <input
-          className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none"
-          defaultValue={todo.title}
-          maxLength={80}
-          name="title"
-          required
-          type="text"
-        />
-        <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+    <article className="rounded-3xl border border-[var(--line)] bg-white/80 p-4">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-semibold text-[var(--muted)]">내 할 일</span>
+          {completedThisWeek ? <StarBadge count={1} /> : null}
+        </div>
+        <form action={updateTodo} className="space-y-3">
+          <input name="todoId" type="hidden" value={todo.id} />
           <input
-            className="h-4 w-4 accent-[var(--accent)]"
-            defaultChecked={todo.isContentPublic}
-            name="isContentPublic"
-            type="checkbox"
+            className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none"
+            defaultValue={todo.title}
+            maxLength={80}
+            name="title"
+            required
+            type="text"
           />
-          내용 공개
-        </label>
-        <div className="flex gap-2">
+          <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+            <input
+              className="h-4 w-4 accent-[var(--accent)]"
+              defaultChecked={todo.isContentPublic}
+              name="isContentPublic"
+              type="checkbox"
+            />
+            내용 공개
+          </label>
           <button
             className="rounded-full bg-[var(--foreground)] px-3 py-2 text-xs font-semibold text-white"
             type="submit"
           >
             수정
           </button>
-        </div>
-      </form>
-      <form action={deleteTodo} className="mt-2">
-        <input name="todoId" type="hidden" value={todo.id} />
-        <button
-          className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
-          type="submit"
-        >
-          삭제
-        </button>
-      </form>
+        </form>
+
+        <form action={deleteTodo}>
+          <input name="todoId" type="hidden" value={todo.id} />
+          <button
+            className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
+            type="submit"
+          >
+            삭제
+          </button>
+        </form>
+      </div>
     </article>
   );
 }
@@ -152,19 +213,26 @@ function SidebarTodoItem({ todo }: { todo: TodoWithChecksRecord }) {
 function Sidebar({
   currentUserName,
   myTodos,
+  week,
 }: {
   currentUserName: string;
   myTodos: TodoWithChecksRecord[];
+  week: WeekDay[];
 }) {
+  const completedCount = countCompletedTodos(myTodos, week);
+
   return (
-    <aside className="space-y-4">
+    <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
       <section className="glass-panel rounded-[28px] p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-              내 관리 바
+              내 투두 관리
             </p>
-            <h2 className="display-font mt-2 text-2xl font-bold">{currentUserName}</h2>
+            <div className="mt-2 flex items-center gap-2">
+              <h2 className="display-font text-xl font-bold">{currentUserName}</h2>
+              {completedCount > 0 ? <StarBadge count={completedCount} /> : null}
+            </div>
           </div>
           <form action={signOut}>
             <button
@@ -177,12 +245,13 @@ function Sidebar({
         </div>
 
         <p className="mt-3 text-xs leading-6 text-[var(--muted)]">
-          할 일 추가, 수정, 삭제는 여기서 하고 체크는 오른쪽 메인 표에서 직접 합니다.
+          왼쪽에서는 할 일을 만들고 수정합니다. 주간 체크는 오른쪽 표에서 내 행만 직접
+          누를 수 있습니다.
         </p>
       </section>
 
       <section className="glass-panel rounded-[28px] p-5">
-        <h3 className="text-sm font-semibold">새 할 일 추가</h3>
+        <h3 className="text-sm font-semibold">할 일 추가</h3>
         <form action={createTodo} className="mt-3 space-y-3">
           <input
             className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-3 text-sm outline-none placeholder:text-[var(--muted)]"
@@ -212,15 +281,15 @@ function Sidebar({
 
       <section className="glass-panel rounded-[28px] p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">내 할 일</h3>
+          <h3 className="text-sm font-semibold">내 목록</h3>
           <span className="text-xs text-[var(--muted)]">{myTodos.length}개</span>
         </div>
         <div className="mt-3 space-y-3">
           {myTodos.length > 0 ? (
-            myTodos.map((todo) => <SidebarTodoItem key={todo.id} todo={todo} />)
+            myTodos.map((todo) => <SidebarTodoItem key={todo.id} todo={todo} week={week} />)
           ) : (
             <p className="text-xs leading-6 text-[var(--muted)]">
-              아직 할 일이 없습니다. 위에서 하나 추가하세요.
+              아직 등록된 할 일이 없습니다. 위에서 하나 추가해 보세요.
             </p>
           )}
         </div>
@@ -238,9 +307,20 @@ function BoardTable({
   groups: ReturnType<typeof groupBoardTodos>;
   week: WeekDay[];
 }) {
+  if (groups.length === 0) {
+    return (
+      <div className="glass-panel rounded-[30px] p-8">
+        <h2 className="display-font text-2xl font-bold">사용자별 주간 체크 표</h2>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+          아직 등록된 할 일이 없습니다. 로그인한 뒤 왼쪽에서 첫 할 일을 만들어 보세요.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-panel overflow-hidden rounded-[30px]">
-      <div className="border-b border-[var(--line)] bg-white/55 px-5 py-4">
+      <div className="border-b border-[var(--line)] bg-white/60 px-5 py-4">
         <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
           메인 보드
         </p>
@@ -250,7 +330,7 @@ function BoardTable({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] border-separate border-spacing-0">
           <thead>
-            <tr className="bg-[rgba(255,255,255,0.72)]">
+            <tr className="bg-[rgba(255,255,255,0.82)]">
               <th className="border-b border-[var(--line)] px-4 py-3 text-left text-xs font-semibold">
                 사용자
               </th>
@@ -262,88 +342,78 @@ function BoardTable({
                   key={day.dateKey}
                   className="border-b border-[var(--line)] px-2 py-3 text-center text-xs font-semibold"
                 >
-                  {formatWeekColumnLabel(day)}
+                  <div className={day.isToday ? "text-[var(--accent)]" : ""}>
+                    {formatWeekColumnLabel(day)}
+                  </div>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {groups.length > 0 ? (
-              groups.map((group) =>
-                group.todos.map((todo, index) => {
-                  const checkedDates = new Set(todo.checks.map((check) => check.dateKey));
-                  const isMine = currentUserId === todo.userId;
+            {groups.map((group) =>
+              group.todos.map((todo, index) => {
+                const isMine = group.userId === currentUserId;
+                const checkDates = new Set(todo.checks.map((check) => check.dateKey));
 
-                  return (
-                    <tr
-                      key={todo.id}
-                      className={isMine ? "bg-[rgba(255,248,242,0.92)]" : "bg-white/72"}
-                    >
-                      {index === 0 ? (
-                        <td
-                          rowSpan={group.todos.length}
-                          className="border-b border-[var(--line)] px-4 py-4 align-top"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--sky)] text-sm font-bold">
-                              {group.profileImage ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  alt={`${group.nickname} 프로필`}
-                                  className="h-10 w-10 rounded-2xl object-cover"
-                                  src={group.profileImage}
-                                />
-                              ) : (
-                                group.nickname.slice(0, 1)
-                              )}
-                            </div>
-                            <div>
-                              <div className="text-sm font-semibold text-[var(--foreground)]">
-                                {group.nickname}
-                              </div>
-                              <div className="text-[11px] text-[var(--muted)]">
-                                {isMine ? "내 행은 직접 체크 가능" : "읽기 전용"}
-                              </div>
-                            </div>
+                return (
+                  <tr
+                    key={todo.id}
+                    className="bg-white/75 align-top even:bg-[rgba(255,255,255,0.55)]"
+                  >
+                    {index === 0 ? (
+                      <td
+                        className="border-b border-[var(--line)] px-4 py-4"
+                        rowSpan={group.todos.length}
+                      >
+                        <div className="flex min-h-full items-start gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent)]">
+                            {group.nickname.slice(0, 1)}
                           </div>
-                        </td>
-                      ) : null}
-                      <td className="border-b border-[var(--line)] px-4 py-4 text-sm">
-                        <div className="font-medium text-[var(--foreground)]">
-                          {todo.isContentPublic ? todo.title : "비공개 할 일"}
-                        </div>
-                        <div className="mt-1 text-[11px] text-[var(--muted)]">
-                          {todo.isContentPublic
-                            ? "내용 공개"
-                            : "목록은 보이고 내용만 숨김"}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold">{group.nickname}</p>
+                              {countCompletedTodos(group.todos, week) > 0 ? (
+                                <StarBadge count={countCompletedTodos(group.todos, week)} />
+                              ) : null}
+                              {isMine ? (
+                                <span className="rounded-full bg-[var(--foreground)] px-2 py-1 text-[10px] font-semibold text-white">
+                                  나
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                              {isMine ? "내 행은 직접 체크 가능" : "읽기 전용"}
+                            </p>
+                          </div>
                         </div>
                       </td>
-                      {week.map((day) => (
-                        <td
-                          key={day.dateKey}
-                          className="border-b border-[var(--line)] px-2 py-3 text-center"
-                        >
-                          <CheckCell
-                            checked={checkedDates.has(day.dateKey)}
-                            dateKey={day.dateKey}
-                            editable={isMine}
-                            todoId={todo.id}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                }),
-              )
-            ) : (
-              <tr>
-                <td
-                  className="px-4 py-12 text-center text-sm text-[var(--muted)]"
-                  colSpan={week.length + 2}
-                >
-                  아직 등록된 할 일이 없습니다.
-                </td>
-              </tr>
+                    ) : null}
+
+                    <td className="border-b border-[var(--line)] px-4 py-4">
+                      <div className="text-sm font-medium">
+                        {todo.isContentPublic ? todo.title : "비공개 할 일"}
+                      </div>
+                      <div className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                        {todo.isContentPublic ? "내용 공개" : "목록은 보이고 내용은 숨김"}
+                      </div>
+                    </td>
+
+                    {week.map((day) => (
+                      <td
+                        key={`${todo.id}-${day.dateKey}`}
+                        className="border-b border-[var(--line)] px-2 py-3"
+                      >
+                        <CheckCell
+                          checked={checkDates.has(day.dateKey)}
+                          dateKey={day.dateKey}
+                          editable={isMine}
+                          todoId={todo.id}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                );
+              }),
             )}
           </tbody>
         </table>
@@ -352,76 +422,152 @@ function BoardTable({
   );
 }
 
-function LoginBox({ weekRange }: { weekRange: string }) {
+function Scoreboard({
+  currentUserId,
+  groups,
+  week,
+}: {
+  currentUserId: string | null;
+  groups: ReturnType<typeof groupBoardTodos>;
+  week: WeekDay[];
+}) {
+  const scoreboard = buildScoreboard(groups, week, currentUserId);
+
   return (
-    <section className="glass-panel rounded-[28px] p-6">
-      <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-        이번 주
-      </p>
-      <p className="mono-font mt-2 text-xs text-[var(--foreground)]">{weekRange}</p>
-      <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
-        로그인하면 왼쪽 관리 바에서 할 일을 만들고, 오른쪽 메인 표에서 내 행만 직접 체크할 수 있습니다.
-      </p>
-      <a
-        className="mt-5 block rounded-full bg-[#FEE500] px-4 py-3 text-center text-sm font-semibold text-[#1A1A1A]"
-        href="/api/auth/kakao/start"
-      >
-        카카오로 로그인
-      </a>
+    <section className="glass-panel rounded-[28px] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+            스코어보드
+          </p>
+          <h2 className="display-font mt-1 text-xl font-bold">이번 주 별 집계</h2>
+        </div>
+        <p className="text-[11px] leading-5 text-[var(--muted)]">
+          할 일 하나를 일주일 내내 완료하면 별 1개
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {scoreboard.map((entry, index) => (
+          <div
+            key={entry.userId}
+            className="rounded-3xl border border-[var(--line)] bg-white/80 px-4 py-3"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent)]">
+                  {index + 1}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold">{entry.nickname}</p>
+                    {entry.isMine ? (
+                      <span className="rounded-full bg-[var(--foreground)] px-2 py-1 text-[10px] font-semibold text-white">
+                        나
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-[11px] text-[var(--muted)]">
+                    총 {entry.todoCount}개 중 {entry.stars}개 주간 완료
+                  </p>
+                </div>
+              </div>
+              <StarBadge count={entry.stars} />
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
 
-export default async function Page(props: PageProps<"/">) {
-  const query = await props.searchParams;
-  const currentUser = await getCurrentUser();
+export default async function Home({ searchParams }: PageProps) {
+  const params = searchParams ? await searchParams : undefined;
   const week = getCurrentWeek();
   const weekKeys = week.map((day) => day.dateKey);
-  const kakaoConfigured = isKakaoConfigured();
-  const authMessage = getAuthMessage(query.auth, kakaoConfigured);
+  const currentUser = await getCurrentUser();
+  const boardTodos = listBoardTodos(weekKeys);
+  const groups = groupBoardTodos(boardTodos);
   const myTodos = currentUser ? listTodosForUser(currentUser.id, weekKeys) : [];
-  const boardGroups = groupBoardTodos(listBoardTodos(weekKeys));
+  const kakaoConfigured = isKakaoConfigured();
+  const authMessage = getAuthMessage(params?.auth, kakaoConfigured);
 
   return (
-    <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8">
-      <section className="glass-panel rounded-[28px] px-5 py-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-              공유형 투두리스트
-            </p>
-            <h1 className="display-font mt-1 text-3xl font-bold tracking-[-0.04em] sm:text-4xl">
-              사용자별 주간 체크 표
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              목록은 기본 공개, 각 할 일의 내용만 공개/비공개를 고를 수 있습니다.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[var(--line)] bg-white/75 px-4 py-3 text-xs text-[var(--foreground)]">
-            {formatWeekRange(week)}
-          </div>
-        </div>
-      </section>
+    <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1480px] space-y-5">
+        <section className="glass-panel rounded-[32px] px-5 py-5 sm:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold tracking-[0.22em] text-[var(--muted)]">
+                학산여중 3-1 전용
+              </p>
+              <h1 className="display-font mt-2 text-3xl font-bold sm:text-4xl">
+                공유형 투두리스트
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
+                목록은 기본 공개입니다. 각 할 일은 내용 공개 또는 비공개를 고를 수
+                있고, 오른쪽 메인 표에서 자신의 행만 직접 체크할 수 있습니다.
+              </p>
+            </div>
 
-      {authMessage ? (
-        <section className="glass-panel rounded-[24px] border border-[rgba(236,108,47,0.22)] bg-[rgba(255,246,240,0.92)] px-4 py-4 text-sm leading-6">
-          {authMessage}
+            <div className="flex flex-col items-start gap-3 rounded-[24px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+              <div>
+                <div className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                  이번 주
+                </div>
+                <div className="mt-1 font-semibold">{formatWeekRange(week)}</div>
+              </div>
+
+              {currentUser ? (
+                <div className="text-xs text-[var(--muted)]">
+                  {currentUser.nickname} 님으로 로그인됨
+                </div>
+              ) : (
+                <a
+                  className="rounded-full bg-[#FEE500] px-4 py-2 text-xs font-semibold text-[#191600]"
+                  href="/api/auth/kakao/start"
+                >
+                  카카오로 로그인
+                </a>
+              )}
+            </div>
+          </div>
+
+          {authMessage ? (
+            <div className="mt-4 rounded-2xl border border-[rgba(236,108,47,0.24)] bg-[rgba(236,108,47,0.09)] px-4 py-3 text-sm text-[var(--foreground)]">
+              {authMessage}
+            </div>
+          ) : null}
         </section>
-      ) : null}
 
-      <section className="grid gap-5 lg:grid-cols-[330px_minmax(0,1fr)]">
-        <div>
+        <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
           {currentUser ? (
-            <Sidebar currentUserName={currentUser.nickname} myTodos={myTodos} />
+            <Sidebar currentUserName={currentUser.nickname} myTodos={myTodos} week={week} />
           ) : (
-            <LoginBox weekRange={formatWeekRange(week)} />
+            <aside className="glass-panel rounded-[28px] p-5 lg:sticky lg:top-6 lg:self-start">
+              <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                시작하기
+              </p>
+              <h2 className="display-font mt-2 text-xl font-bold">로그인 후 내 할 일 추가</h2>
+              <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+                카카오 로그인 후 왼쪽 관리 바에서 할 일을 만들 수 있습니다. 체크는
+                오른쪽 메인 표에서 자기 행만 가능합니다.
+              </p>
+              <a
+                className="mt-4 inline-flex rounded-full bg-[#FEE500] px-4 py-3 text-xs font-semibold text-[#191600]"
+                href="/api/auth/kakao/start"
+              >
+                카카오로 로그인
+              </a>
+            </aside>
           )}
-        </div>
 
-        <div className="min-w-0">
-          <BoardTable currentUserId={currentUser?.id ?? null} groups={boardGroups} week={week} />
+          <div className="space-y-5 min-w-0">
+            <Scoreboard currentUserId={currentUser?.id ?? null} groups={groups} week={week} />
+            <BoardTable currentUserId={currentUser?.id ?? null} groups={groups} week={week} />
+          </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
