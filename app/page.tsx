@@ -328,7 +328,90 @@ function BoardTable({
         <h2 className="display-font mt-1 text-2xl font-bold">사용자별 주간 체크 표</h2>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="lg:hidden space-y-3 p-4">
+        {groups.map((group) => {
+          const isMine = group.userId === currentUserId;
+          const completedCount = countCompletedTodos(group.todos, week);
+
+          return (
+            <section
+              key={group.userId}
+              className="rounded-[26px] border border-[var(--line)] bg-white/82 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent)]">
+                    {group.nickname.slice(0, 1)}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold">{group.nickname}</p>
+                      {completedCount > 0 ? <StarBadge count={completedCount} /> : null}
+                      {isMine ? (
+                        <span className="rounded-full bg-[var(--foreground)] px-2 py-1 text-[10px] font-semibold text-white">
+                          나
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                      {isMine ? "아래 카드에서 내 체크를 바로 누를 수 있습니다." : "읽기 전용"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {group.todos.map((todo) => {
+                  const checkDates = new Set(todo.checks.map((check) => check.dateKey));
+
+                  return (
+                    <article
+                      key={todo.id}
+                      className="rounded-3xl border border-[var(--line)] bg-[rgba(255,255,255,0.86)] p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {todo.isContentPublic ? todo.title : "비공개 할 일"}
+                          </p>
+                          <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                            {todo.isContentPublic ? "내용 공개" : "목록은 보이고 내용은 숨김"}
+                          </p>
+                        </div>
+                        {isTodoCompletedForWeek(todo, week) ? <StarBadge count={1} /> : null}
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-4 gap-2">
+                        {week.map((day) => (
+                          <div
+                            key={`${todo.id}-${day.dateKey}`}
+                            className="rounded-2xl border border-[var(--line)] bg-white/90 p-2"
+                          >
+                            <div
+                              className={`mb-2 text-center text-[10px] font-semibold ${day.isToday ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}
+                            >
+                              {day.dayNumber}
+                              {day.shortLabel}
+                            </div>
+                            <CheckCell
+                              checked={checkDates.has(day.dateKey)}
+                              dateKey={day.dateKey}
+                              editable={isMine}
+                              todoId={todo.id}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[980px] border-separate border-spacing-0">
           <thead>
             <tr className="bg-[rgba(255,255,255,0.82)]">
@@ -494,24 +577,28 @@ export default async function Home({ searchParams }: PageProps) {
   const authMessage = getAuthMessage(params?.auth, kakaoConfigured);
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1480px] space-y-5">
-        <section className="glass-panel rounded-[32px] px-5 py-5 sm:px-6">
+    <main className="min-h-screen px-3 py-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1480px] space-y-4 sm:space-y-5">
+        <section className="glass-panel rounded-[28px] px-4 py-4 sm:rounded-[32px] sm:px-6 sm:py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.22em] text-[var(--muted)]">
                 학산여중 3-1 전용
               </p>
-              <h1 className="display-font mt-2 text-3xl font-bold sm:text-4xl">
+              <h1 className="display-font mt-2 text-[28px] font-bold leading-tight sm:text-4xl">
                 공유형 투두리스트
               </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
+              <p className="mt-3 max-w-3xl text-[13px] leading-6 text-[var(--muted)] sm:text-sm sm:leading-7">
                 목록은 기본 공개입니다. 각 할 일은 내용 공개 또는 비공개를 고를 수
                 있고, 오른쪽 메인 표에서 자신의 행만 직접 체크할 수 있습니다.
               </p>
+              <p className="mt-3 max-w-3xl text-[12px] leading-6 text-[var(--muted)] sm:text-sm">
+                어떤 사소한 목표든, 꾸준히 하는 게 중요합니다. 어제보다 한 걸음 더
+                나아간 여러분이 되길 바랍니다 - 범준T
+              </p>
             </div>
 
-            <div className="flex flex-col items-start gap-3 rounded-[24px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+            <div className="flex w-full flex-col items-start gap-3 rounded-[24px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm lg:w-auto">
               <div>
                 <div className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
                   이번 주
@@ -543,29 +630,31 @@ export default async function Home({ searchParams }: PageProps) {
           ) : null}
         </section>
 
-        <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-          {currentUser ? (
-            <Sidebar currentUserName={currentUser.nickname} myTodos={myTodos} week={week} />
-          ) : (
-            <aside className="glass-panel rounded-[28px] p-5 lg:sticky lg:top-6 lg:self-start">
-              <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-                시작하기
-              </p>
-              <h2 className="display-font mt-2 text-xl font-bold">로그인 후 내 할 일 추가</h2>
-              <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-                카카오 로그인 후 왼쪽 관리 바에서 할 일을 만들 수 있습니다. 체크는
-                오른쪽 메인 표에서 자기 행만 가능합니다.
-              </p>
-              <a
-                className="mt-4 inline-flex rounded-full bg-[#FEE500] px-4 py-3 text-xs font-semibold text-[#191600]"
-                href="/api/auth/kakao/start"
-              >
-                카카오로 로그인
-              </a>
-            </aside>
-          )}
+        <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="order-2 lg:order-1">
+            {currentUser ? (
+              <Sidebar currentUserName={currentUser.nickname} myTodos={myTodos} week={week} />
+            ) : (
+              <aside className="glass-panel rounded-[28px] p-5 lg:sticky lg:top-6 lg:self-start">
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                  시작하기
+                </p>
+                <h2 className="display-font mt-2 text-xl font-bold">로그인 후 내 할 일 추가</h2>
+                <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+                  카카오 로그인 후 왼쪽 관리 바에서 할 일을 만들 수 있습니다. 체크는
+                  오른쪽 메인 표에서 자기 행만 가능합니다.
+                </p>
+                <a
+                  className="mt-4 inline-flex rounded-full bg-[#FEE500] px-4 py-3 text-xs font-semibold text-[#191600]"
+                  href="/api/auth/kakao/start"
+                >
+                  카카오로 로그인
+                </a>
+              </aside>
+            )}
+          </div>
 
-          <div className="space-y-5 min-w-0">
+          <div className="order-1 space-y-4 min-w-0 lg:order-2 lg:space-y-5">
             <Scoreboard currentUserId={currentUser?.id ?? null} groups={groups} week={week} />
             <BoardTable currentUserId={currentUser?.id ?? null} groups={groups} week={week} />
           </div>
