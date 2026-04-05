@@ -22,7 +22,13 @@ const monoFont = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "함께 쓰는 투두",
-  description: "카카오 로그인으로 시작하는 공유형 주간 투두리스트",
+  description: "카카오 로그인으로 사용하는 공유형 주간 투두리스트",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "학산여중 3-1",
+  },
 };
 
 export default function RootLayout({

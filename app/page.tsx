@@ -18,6 +18,7 @@ import {
   getCurrentWeek,
   type WeekDay,
 } from "@/lib/week";
+import { InstallShortcut } from "@/components/install-shortcut";
 
 type PageProps = {
   searchParams?: Promise<{
@@ -530,6 +531,8 @@ export default async function Home({ searchParams }: PageProps) {
                   카카오로 로그인
                 </a>
               )}
+
+              <InstallShortcut />
             </div>
           </div>
 
