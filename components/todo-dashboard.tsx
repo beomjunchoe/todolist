@@ -115,6 +115,27 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
             <InstallShortcut />
           </div>
 
+          <div className="mt-3 grid grid-cols-3 gap-2 lg:hidden">
+            <a
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+              href="#my-todos"
+            >
+              내 목록
+            </a>
+            <a
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+              href="#scoreboard"
+            >
+              별 집계
+            </a>
+            <a
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+              href="#weekly-board"
+            >
+              체크 보드
+            </a>
+          </div>
+
           {currentUserIsAdmin ? (
             <p className="mt-3 text-[11px] leading-5 text-[var(--muted)]">
               관리자 모드에서는 다른 사람 할 일도 메인 보드에서 삭제할 수
@@ -124,7 +145,7 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="order-2 lg:order-1">
+          <div className="order-2 lg:order-1" id="my-todos">
             {currentUser ? (
               <Sidebar
                 currentUserName={currentUser.nickname}
@@ -155,18 +176,22 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
           </div>
 
           <div className="order-1 min-w-0 space-y-4 lg:order-2 lg:space-y-5">
-            <Scoreboard
-              currentUserId={currentUser?.id ?? null}
-              groups={groups}
-              userStarTotals={userStarTotals}
-            />
-            <BoardTable
-              currentUserId={currentUser?.id ?? null}
-              currentUserIsAdmin={currentUserIsAdmin}
-              groups={groups}
-              userStarTotals={userStarTotals}
-              week={week}
-            />
+            <div id="scoreboard">
+              <Scoreboard
+                currentUserId={currentUser?.id ?? null}
+                groups={groups}
+                userStarTotals={userStarTotals}
+              />
+            </div>
+            <div id="weekly-board">
+              <BoardTable
+                currentUserId={currentUser?.id ?? null}
+                currentUserIsAdmin={currentUserIsAdmin}
+                groups={groups}
+                userStarTotals={userStarTotals}
+                week={week}
+              />
+            </div>
           </div>
         </div>
       </div>

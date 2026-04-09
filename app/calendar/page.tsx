@@ -12,14 +12,11 @@ import { getCurrentUser, isAdminUser } from "@/lib/auth";
 import {
   expandEventDateKeys,
   formatEventDateRange,
-  getEventDdayLabel,
   getCalendarMonth,
+  getEventDdayLabel,
   getTodayDateKey,
 } from "@/lib/calendar";
-import {
-  listClassEventsInRange,
-  type ClassEventRecord,
-} from "@/lib/db";
+import { listClassEventsInRange, type ClassEventRecord } from "@/lib/db";
 import { SUBJECTS } from "@/lib/subjects";
 
 type PageProps = {
@@ -96,16 +93,118 @@ function buildEventsByDate(events: ClassEventRecord[]) {
   return eventsByDate;
 }
 
+function EventCreateForm({ todayDateKey }: { todayDateKey: string }) {
+  return (
+    <form action={createClassEventAction} className="space-y-3">
+      <label className="space-y-1 text-sm">
+        <span className="font-medium">제목</span>
+        <input
+          className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+          name="title"
+          placeholder="예: 수학 수행평가"
+          required
+          type="text"
+        />
+      </label>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">분류</span>
+          <select
+            className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+            defaultValue="시험"
+            name="category"
+          >
+            {CATEGORY_OPTIONS.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">중요도</span>
+          <select
+            className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+            defaultValue="high"
+            name="importance"
+          >
+            {IMPORTANCE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">과목</span>
+          <select
+            className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+            defaultValue=""
+            name="subjectSlug"
+          >
+            <option value="">공통</option>
+            {SUBJECTS.map((subject) => (
+              <option key={subject.slug} value={subject.slug}>
+                {subject.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">시작 날짜</span>
+          <input
+            className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+            defaultValue={todayDateKey}
+            name="startsOn"
+            required
+            type="date"
+          />
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">종료 날짜</span>
+          <input
+            className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+            name="endsOn"
+            type="date"
+          />
+        </label>
+      </div>
+
+      <label className="space-y-1 text-sm">
+        <span className="font-medium">설명</span>
+        <textarea
+          className="min-h-28 w-full rounded-[20px] border border-[var(--line)] bg-white px-3 py-3 text-sm"
+          name="description"
+          placeholder="범위, 준비물, 장소 같은 내용을 적어두세요."
+          required
+        />
+      </label>
+
+      <button
+        className="w-full rounded-full bg-[var(--foreground)] px-4 py-3 text-sm font-semibold text-white"
+        type="submit"
+      >
+        일정 등록
+      </button>
+    </form>
+  );
+}
+
 function EventCard({
   currentUserId,
-  todayDateKey,
   currentUserIsAdmin,
   event,
+  todayDateKey,
 }: {
   currentUserId: string | null;
-  todayDateKey: string;
   currentUserIsAdmin: boolean;
   event: ClassEventRecord;
+  todayDateKey: string;
 }) {
   const ddayLabel = getEventDdayLabel(todayDateKey, event.startsOn, event.endsOn);
   const canManage = currentUserIsAdmin || currentUserId === event.user.id;
@@ -148,75 +247,55 @@ function EventCard({
       </p>
 
       {canManage ? (
-        <div className="mt-4 space-y-3">
-          <details className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.7)] p-3">
-            <summary className="cursor-pointer text-sm font-semibold">일정 수정</summary>
-            <form action={updateClassEventAction} className="mt-3 space-y-3">
-              <input name="eventId" type="hidden" value={event.id} />
+        <details className="mt-4 rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.7)] p-3">
+          <summary className="cursor-pointer list-none text-sm font-semibold">
+            일정 관리
+          </summary>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1 text-sm">
-                  <span className="font-medium">제목</span>
-                  <input
-                    className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                    defaultValue={event.title}
-                    name="title"
-                    required
-                    type="text"
-                  />
-                </label>
+          <form action={updateClassEventAction} className="mt-3 space-y-3">
+            <input name="eventId" type="hidden" value={event.id} />
 
-                <label className="space-y-1 text-sm">
-                  <span className="font-medium">분류</span>
-                  <select
-                    className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                    defaultValue={event.category}
-                    name="category"
-                  >
-                    {CATEGORY_OPTIONS.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm">
+                <span className="font-medium">제목</span>
+                <input
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+                  defaultValue={event.title}
+                  name="title"
+                  required
+                  type="text"
+                />
+              </label>
 
-                <label className="space-y-1 text-sm">
-                  <span className="font-medium">중요도</span>
-                  <select
-                    className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                    defaultValue={event.importance}
-                    name="importance"
-                  >
-                    {IMPORTANCE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <label className="space-y-1 text-sm">
+                <span className="font-medium">분류</span>
+                <select
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+                  defaultValue={event.category}
+                  name="category"
+                >
+                  {CATEGORY_OPTIONS.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-                <label className="space-y-1 text-sm">
-                  <span className="font-medium">시작 날짜</span>
-                  <input
-                    className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                    defaultValue={event.startsOn}
-                    name="startsOn"
-                    required
-                    type="date"
-                  />
-                </label>
-
-                <label className="space-y-1 text-sm">
-                  <span className="font-medium">종료 날짜</span>
-                  <input
-                    className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                    defaultValue={event.endsOn ?? ""}
-                    name="endsOn"
-                    type="date"
-                  />
-                </label>
-              </div>
+              <label className="space-y-1 text-sm">
+                <span className="font-medium">중요도</span>
+                <select
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+                  defaultValue={event.importance}
+                  name="importance"
+                >
+                  {IMPORTANCE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <label className="space-y-1 text-sm">
                 <span className="font-medium">과목</span>
@@ -235,36 +314,57 @@ function EventCard({
               </label>
 
               <label className="space-y-1 text-sm">
-                <span className="font-medium">설명</span>
-                <textarea
-                  className="min-h-28 w-full rounded-[20px] border border-[var(--line)] bg-white px-3 py-3 text-sm"
-                  defaultValue={event.description}
-                  name="description"
+                <span className="font-medium">시작 날짜</span>
+                <input
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+                  defaultValue={event.startsOn}
+                  name="startsOn"
                   required
+                  type="date"
                 />
               </label>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="rounded-full bg-[var(--foreground)] px-4 py-2.5 text-sm font-semibold text-white"
-                  type="submit"
-                >
-                  수정 저장
-                </button>
-              </div>
-            </form>
-          </details>
+              <label className="space-y-1 text-sm">
+                <span className="font-medium">종료 날짜</span>
+                <input
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+                  defaultValue={event.endsOn ?? ""}
+                  name="endsOn"
+                  type="date"
+                />
+              </label>
+            </div>
 
-          <form action={deleteClassEventAction}>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium">설명</span>
+              <textarea
+                className="min-h-28 w-full rounded-[20px] border border-[var(--line)] bg-white px-3 py-3 text-sm"
+                defaultValue={event.description}
+                name="description"
+                required
+              />
+            </label>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-full bg-[var(--foreground)] px-4 py-2.5 text-sm font-semibold text-white"
+                type="submit"
+              >
+                수정 저장
+              </button>
+            </div>
+          </form>
+
+          <form action={deleteClassEventAction} className="mt-3">
             <input name="eventId" type="hidden" value={event.id} />
             <button
-              className="rounded-full border border-[rgba(180,60,40,0.18)] bg-[rgba(255,241,236,0.95)] px-4 py-2.5 text-sm font-semibold text-[#a23b2c]"
+              className="w-full rounded-full border border-[rgba(180,60,40,0.18)] bg-[rgba(255,241,236,0.95)] px-4 py-2.5 text-sm font-semibold text-[#a23b2c]"
               type="submit"
             >
               일정 삭제
             </button>
           </form>
-        </div>
+        </details>
       ) : null}
     </article>
   );
@@ -285,6 +385,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     ? allMonthEvents.filter((event) => event.subjectSlug === selectedSubject)
     : allMonthEvents;
   const eventsByDate = buildEventsByDate(monthEvents);
+  const monthQuery = selectedSubject ? `&subject=${selectedSubject}` : "";
 
   return (
     <main className="min-h-screen px-3 py-4 pb-28 sm:px-6 sm:pb-6 lg:px-8">
@@ -315,7 +416,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
                 <div className="flex items-center justify-between gap-3">
                   <Link
                     className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
-                    href={`/calendar?month=${month.prevMonthKey}${selectedSubject ? `&subject=${selectedSubject}` : ""}`}
+                    href={`/calendar?month=${month.prevMonthKey}${monthQuery}`}
                   >
                     이전 달
                   </Link>
@@ -327,7 +428,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
                   </div>
                   <Link
                     className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
-                    href={`/calendar?month=${month.nextMonthKey}${selectedSubject ? `&subject=${selectedSubject}` : ""}`}
+                    href={`/calendar?month=${month.nextMonthKey}${monthQuery}`}
                   >
                     다음 달
                   </Link>
@@ -374,218 +475,162 @@ export default async function CalendarPage({ searchParams }: PageProps) {
               )}
             </div>
           </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2 lg:hidden">
+            <a
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+              href="#calendar-grid"
+            >
+              달력
+            </a>
+            <a
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+              href="#calendar-form"
+            >
+              일정 등록
+            </a>
+            <a
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+              href="#calendar-list"
+            >
+              목록
+            </a>
+          </div>
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_380px] lg:gap-5">
-          <section className="glass-panel overflow-hidden rounded-[28px]">
-            <div className="border-b border-[var(--line)] px-4 py-4 sm:px-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <Link
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-white text-lg font-semibold"
-                  href={`/calendar?month=${month.prevMonthKey}${selectedSubject ? `&subject=${selectedSubject}` : ""}`}
-                >
-                  ‹
-                </Link>
+          <section className="glass-panel overflow-hidden rounded-[28px]" id="calendar-grid">
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                <div className="border-b border-[var(--line)] px-4 py-4 sm:px-5">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <Link
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-white text-lg font-semibold"
+                      href={`/calendar?month=${month.prevMonthKey}${monthQuery}`}
+                    >
+                      ‹
+                    </Link>
 
-                <div className="text-center">
-                  <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-                    월별 이동
-                  </p>
-                  <h2 className="display-font mt-1 text-xl font-bold sm:text-2xl">
-                    {month.monthLabel}
-                  </h2>
+                    <div className="text-center">
+                      <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                        월별 이동
+                      </p>
+                      <h2 className="display-font mt-1 text-xl font-bold sm:text-2xl">
+                        {month.monthLabel}
+                      </h2>
+                    </div>
+
+                    <Link
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-white text-lg font-semibold"
+                      href={`/calendar?month=${month.nextMonthKey}${monthQuery}`}
+                    >
+                      ›
+                    </Link>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold tracking-[0.16em] text-[var(--muted)]">
+                    {WEEKDAY_LABELS.map((label, index) => (
+                      <div
+                        key={label}
+                        className={
+                          index === 0
+                            ? "text-[var(--accent)]"
+                            : index === 6
+                              ? "text-[var(--sky)]"
+                              : ""
+                        }
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <Link
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-white text-lg font-semibold"
-                  href={`/calendar?month=${month.nextMonthKey}${selectedSubject ? `&subject=${selectedSubject}` : ""}`}
-                >
-                  ›
-                </Link>
-              </div>
+                <div className="grid grid-cols-7 gap-px bg-[var(--line)]">
+                  {month.weeks.flat().map((day) => {
+                    const dayEvents = eventsByDate.get(day.dateKey) ?? [];
 
-              <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold tracking-[0.16em] text-[var(--muted)]">
-                {WEEKDAY_LABELS.map((label, index) => (
-                  <div
-                    key={label}
-                    className={
-                      index === 0
-                        ? "text-[var(--accent)]"
-                        : index === 6
-                          ? "text-[var(--sky)]"
-                          : ""
-                    }
-                  >
-                    {label}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-px bg-[var(--line)]">
-              {month.weeks.flat().map((day) => {
-                const dayEvents = eventsByDate.get(day.dateKey) ?? [];
-
-                return (
-                  <div
-                    key={day.dateKey}
-                    className={`min-h-28 bg-white/88 p-2 sm:min-h-32 sm:p-3 ${
-                      day.isCurrentMonth ? "" : "bg-[rgba(255,255,255,0.46)]"
-                    }`}
-                  >
-                    <div
-                      className={`flex items-center justify-between text-xs font-semibold ${
-                        day.weekdayNumber === 0
-                          ? "text-[var(--accent)]"
-                          : day.weekdayNumber === 6
-                            ? "text-[var(--sky)]"
-                            : day.isToday
-                              ? "text-[var(--foreground)]"
-                              : "text-[var(--muted)]"
-                      }`}
-                    >
-                      <span>{day.dayNumber}</span>
-                      {day.isToday ? (
-                        <span className="rounded-full bg-[var(--foreground)] px-2 py-0.5 text-[10px] text-white">
-                          오늘
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-2 space-y-1.5">
-                      {dayEvents.slice(0, 3).map((event) => (
+                    return (
+                      <div
+                        key={day.dateKey}
+                        className={`min-h-28 bg-white/88 p-2 sm:min-h-32 sm:p-3 ${
+                          day.isCurrentMonth ? "" : "bg-[rgba(255,255,255,0.46)]"
+                        }`}
+                      >
                         <div
-                          key={`${day.dateKey}-${event.id}`}
-                          className={`truncate rounded-xl px-2 py-1 text-[11px] font-medium ring-1 ring-inset ring-[rgba(19,34,29,0.06)] ${getCategoryClasses(
-                            event.category,
-                          )}`}
-                          title={`${event.title} · ${getSubjectLabel(event.subjectSlug)} · ${getEventDdayLabel(
-                            todayDateKey,
-                            event.startsOn,
-                            event.endsOn,
-                          )}`}
+                          className={`flex items-center justify-between text-xs font-semibold ${
+                            day.weekdayNumber === 0
+                              ? "text-[var(--accent)]"
+                              : day.weekdayNumber === 6
+                                ? "text-[var(--sky)]"
+                                : day.isToday
+                                  ? "text-[var(--foreground)]"
+                                  : "text-[var(--muted)]"
+                          }`}
                         >
-                          {event.title}
+                          <span>{day.dayNumber}</span>
+                          {day.isToday ? (
+                            <span className="rounded-full bg-[var(--foreground)] px-2 py-0.5 text-[10px] text-white">
+                              오늘
+                            </span>
+                          ) : null}
                         </div>
-                      ))}
-                      {dayEvents.length > 3 ? (
-                        <div className="text-[11px] font-medium text-[var(--muted)]">
-                          +{dayEvents.length - 3}개 더
+
+                        <div className="mt-2 space-y-1.5">
+                          {dayEvents.slice(0, 3).map((event) => (
+                            <div
+                              key={`${day.dateKey}-${event.id}`}
+                              className={`truncate rounded-xl px-2 py-1 text-[11px] font-medium ring-1 ring-inset ring-[rgba(19,34,29,0.06)] ${getCategoryClasses(
+                                event.category,
+                              )}`}
+                              title={`${event.title} · ${getSubjectLabel(event.subjectSlug)} · ${getEventDdayLabel(
+                                todayDateKey,
+                                event.startsOn,
+                                event.endsOn,
+                              )}`}
+                            >
+                              {event.title}
+                            </div>
+                          ))}
+                          {dayEvents.length > 3 ? (
+                            <div className="text-[11px] font-medium text-[var(--muted)]">
+                              +{dayEvents.length - 3}개 더
+                            </div>
+                          ) : null}
                         </div>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </section>
 
           <aside>
             {currentUser ? (
-              <section className="glass-panel rounded-[28px] p-4 sm:p-5">
-                <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-                  일정 등록
-                </p>
-                <h2 className="display-font mt-1 text-xl font-bold">일정 올리기</h2>
-
-                <form action={createClassEventAction} className="mt-4 space-y-3">
-                  <label className="space-y-1 text-sm">
-                    <span className="font-medium">제목</span>
-                    <input
-                      className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                      name="title"
-                      placeholder="예: 수학 수행평가"
-                      required
-                      type="text"
-                    />
-                  </label>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="space-y-1 text-sm">
-                      <span className="font-medium">분류</span>
-                      <select
-                        className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                        defaultValue="시험"
-                        name="category"
-                      >
-                        {CATEGORY_OPTIONS.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="space-y-1 text-sm">
-                      <span className="font-medium">중요도</span>
-                      <select
-                        className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                        defaultValue="high"
-                        name="importance"
-                      >
-                        {IMPORTANCE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="space-y-1 text-sm">
-                      <span className="font-medium">과목</span>
-                      <select
-                        className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                        defaultValue=""
-                        name="subjectSlug"
-                      >
-                        <option value="">공통</option>
-                        {SUBJECTS.map((subject) => (
-                          <option key={subject.slug} value={subject.slug}>
-                            {subject.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="space-y-1 text-sm">
-                      <span className="font-medium">시작 날짜</span>
-                      <input
-                        className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                        defaultValue={todayDateKey}
-                        name="startsOn"
-                        required
-                        type="date"
-                      />
-                    </label>
-
-                    <label className="space-y-1 text-sm">
-                      <span className="font-medium">종료 날짜</span>
-                      <input
-                        className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
-                        name="endsOn"
-                        type="date"
-                      />
-                    </label>
+              <>
+                <details
+                  className="glass-panel rounded-[28px] p-4 sm:p-5 lg:hidden"
+                  id="calendar-form"
+                >
+                  <summary className="cursor-pointer list-none text-base font-semibold">
+                    일정 등록 열기
+                  </summary>
+                  <div className="mt-4">
+                    <EventCreateForm todayDateKey={todayDateKey} />
                   </div>
+                </details>
 
-                  <label className="space-y-1 text-sm">
-                    <span className="font-medium">설명</span>
-                    <textarea
-                      className="min-h-28 w-full rounded-[20px] border border-[var(--line)] bg-white px-3 py-3 text-sm"
-                      name="description"
-                      placeholder="범위, 준비물, 장소 같은 내용을 적어두세요."
-                      required
-                    />
-                  </label>
-
-                  <button
-                    className="w-full rounded-full bg-[var(--foreground)] px-4 py-3 text-sm font-semibold text-white"
-                    type="submit"
-                  >
+                <section className="hidden glass-panel rounded-[28px] p-4 sm:p-5 lg:block">
+                  <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
                     일정 등록
-                  </button>
-                </form>
-              </section>
+                  </p>
+                  <h2 className="display-font mt-1 text-xl font-bold">일정 올리기</h2>
+                  <div className="mt-4">
+                    <EventCreateForm todayDateKey={todayDateKey} />
+                  </div>
+                </section>
+              </>
             ) : (
               <section className="glass-panel rounded-[28px] p-4 sm:p-5">
                 <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
@@ -606,7 +651,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           </aside>
         </div>
 
-        <section className="glass-panel rounded-[28px] p-4 sm:p-5">
+        <section className="glass-panel rounded-[28px] p-4 sm:p-5" id="calendar-list">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
@@ -619,9 +664,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
                 </p>
               ) : null}
             </div>
-            <div className="text-[12px] text-[var(--muted)]">
-              총 {monthEvents.length}개
-            </div>
+            <div className="text-[12px] text-[var(--muted)]">총 {monthEvents.length}개</div>
           </div>
 
           <div className="mt-4 grid gap-3 lg:grid-cols-2">

@@ -26,26 +26,34 @@ export default async function BoardsPage() {
             과목별 게시판
           </h1>
           <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-            과목별로 정리한 내용, 시험 대비 팁, 수행평가 자료를 자유롭게 올리고
-            댓글로 이어서 정리할 수 있습니다.
+            정리 자료, 질문, 수행평가 준비 내용을 과목별로 나눠서 올리는 공간입니다.
+            모바일에서는 한 줄 카드로 크게 보여서 바로 들어가기 쉽게 정리했습니다.
           </p>
         </section>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {SUBJECTS.map((subject) => (
             <Link
               key={subject.slug}
               className="glass-panel rounded-[24px] px-4 py-4"
               href={`/boards/${subject.slug}`}
             >
-              <div className="text-sm font-semibold">{subject.name}</div>
-              <div className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
-                {subject.description}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-base font-semibold">{subject.name}</div>
+                  <div className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
+                    {subject.description}
+                  </div>
+                </div>
+                <div className="rounded-full border border-[var(--line)] px-3 py-1 text-[11px] font-semibold">
+                  들어가기
+                </div>
               </div>
             </Link>
           ))}
         </div>
       </div>
+
       <MobileTabBar currentPath="/boards" />
     </main>
   );

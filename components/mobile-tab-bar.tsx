@@ -21,7 +21,7 @@ export function MobileTabBar({
           return (
             <Link
               key={link.href}
-              className={`flex min-h-12 items-center justify-center rounded-full text-sm font-semibold ${
+              className={`flex min-h-12 items-center justify-center rounded-full text-[13px] font-semibold ${
                 active
                   ? "bg-[var(--foreground)] text-white"
                   : "border border-[var(--line)] bg-white text-[var(--foreground)]"

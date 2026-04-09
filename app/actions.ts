@@ -329,7 +329,7 @@ function normalizeImportance(value: FormDataEntryValue | null) {
 }
 
 export async function createClassEventAction(formData: FormData) {
-  const user = await requireAdminUser();
+  const user = await requireSignedInUser();
   const title = `${formData.get("title") ?? ""}`.trim();
   const description = `${formData.get("description") ?? ""}`.trim();
   const category = `${formData.get("category") ?? ""}`.trim() || "기타";
@@ -357,7 +357,7 @@ export async function createClassEventAction(formData: FormData) {
 }
 
 export async function updateClassEventAction(formData: FormData) {
-  const user = await requireAdminUser();
+  const user = await requireSignedInUser();
   const eventId = `${formData.get("eventId") ?? ""}`.trim();
   const title = `${formData.get("title") ?? ""}`.trim();
   const description = `${formData.get("description") ?? ""}`.trim();
@@ -378,7 +378,7 @@ export async function updateClassEventAction(formData: FormData) {
     endsOn: endsOn && endsOn >= startsOn ? endsOn : null,
     eventId,
     importance,
-    isAdmin: true,
+    isAdmin: isAdminUser(user),
     startsOn,
     subjectSlug,
     title: title.slice(0, 100),
@@ -388,7 +388,7 @@ export async function updateClassEventAction(formData: FormData) {
 }
 
 export async function deleteClassEventAction(formData: FormData) {
-  const user = await requireAdminUser();
+  const user = await requireSignedInUser();
   const eventId = `${formData.get("eventId") ?? ""}`.trim();
 
   if (!eventId) {
@@ -398,7 +398,7 @@ export async function deleteClassEventAction(formData: FormData) {
   deleteClassEventRecord({
     actorUserId: user.id,
     eventId,
-    isAdmin: true,
+    isAdmin: isAdminUser(user),
   });
 
   revalidateCalendarPages();

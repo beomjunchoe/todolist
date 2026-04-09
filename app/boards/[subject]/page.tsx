@@ -164,7 +164,31 @@ export default async function SubjectBoardPage({
           </div>
         </section>
 
-        <section className="glass-panel rounded-[24px] p-4 sm:rounded-[28px] sm:p-5">
+        <div className="grid grid-cols-3 gap-2 lg:hidden">
+          <a
+            className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+            href="#board-search"
+          >
+            검색
+          </a>
+          <a
+            className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+            href="#write-post"
+          >
+            글쓰기
+          </a>
+          <a
+            className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-center text-[11px] font-semibold"
+            href="#board-posts"
+          >
+            글목록
+          </a>
+        </div>
+
+        <section
+          className="glass-panel rounded-[24px] p-4 sm:rounded-[28px] sm:p-5"
+          id="board-search"
+        >
           <div className="flex flex-col gap-3">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
@@ -238,7 +262,7 @@ export default async function SubjectBoardPage({
           </>
         ) : null}
 
-        <section className="space-y-3 sm:space-y-4">
+        <section className="space-y-3 sm:space-y-4" id="board-posts">
           {posts.length > 0 ? (
             posts.map((post) => {
               const canManagePost =
@@ -384,11 +408,25 @@ export default async function SubjectBoardPage({
                             수정 저장
                           </button>
                         </form>
+                        <form action={deleteBoardPostAction} className="mt-3 sm:hidden">
+                          <input name="postId" type="hidden" value={post.id} />
+                          <input
+                            name="subjectSlug"
+                            type="hidden"
+                            value={subject.slug}
+                          />
+                          <button
+                            className="w-full rounded-full border border-[rgba(179,51,51,0.2)] bg-[rgba(179,51,51,0.08)] px-4 py-2.5 text-xs font-semibold text-[#8e2525]"
+                            type="submit"
+                          >
+                            삭제
+                          </button>
+                        </form>
                       </details>
                     ) : null}
 
                     {canManagePost ? (
-                      <form action={deleteBoardPostAction}>
+                      <form action={deleteBoardPostAction} className="hidden sm:block">
                         <input name="postId" type="hidden" value={post.id} />
                         <input
                           name="subjectSlug"

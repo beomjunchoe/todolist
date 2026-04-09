@@ -20,7 +20,7 @@ export default async function HomePage() {
         />
 
         <section className="glass-panel rounded-[28px] px-4 py-5 sm:rounded-[32px] sm:px-6 sm:py-6">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)] lg:items-end">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)] lg:items-end">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.22em] text-[var(--muted)]">
                 학산여중 3-1 전용
@@ -29,15 +29,15 @@ export default async function HomePage() {
                 같이 쓰는 학급 홈페이지
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-                투두리스트로 매일 체크하고, 과목별 게시판에는 정리한 내용과 공부
-                자료를 올려 서로 도와줄 수 있게 구성했습니다.
+                투두리스트로 매일 체크하고, 일정 캘린더로 시험과 숙제를 보고,
+                과목별 게시판에 정리한 내용을 올리는 반 전용 페이지입니다.
               </p>
               <p className="mt-3 max-w-3xl text-[12px] leading-6 text-[var(--muted)] sm:text-sm">
-                어떤 사소한 목표든, 꾸준히 하는 게 중요합니다. 어제보다 한 걸음
-                더 나아간 여러분이 되길 바랍니다 - 범준T
+                어떤 사소한 목표든, 꾸준히 하는 게 중요합니다. 어제보다 한 걸음 더
+                나아간 여러분이 되길 바랍니다 - 범준T
               </p>
 
-              <div className="mt-5 grid gap-2 sm:flex sm:flex-wrap">
+              <div className="mt-5 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
                 <Link
                   className="flex items-center justify-center rounded-full bg-[var(--foreground)] px-4 py-3 text-sm font-semibold text-white"
                   href="/todo"
@@ -65,9 +65,39 @@ export default async function HomePage() {
                   </a>
                 ) : null}
               </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-2 lg:hidden">
+                <Link
+                  className="rounded-[20px] border border-[var(--line)] bg-white/84 px-3 py-3"
+                  href="/todo"
+                >
+                  <div className="text-sm font-semibold">투두</div>
+                  <div className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                    주간 체크
+                  </div>
+                </Link>
+                <Link
+                  className="rounded-[20px] border border-[var(--line)] bg-white/84 px-3 py-3"
+                  href="/calendar"
+                >
+                  <div className="text-sm font-semibold">일정</div>
+                  <div className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                    시험·숙제
+                  </div>
+                </Link>
+                <Link
+                  className="rounded-[20px] border border-[var(--line)] bg-white/84 px-3 py-3"
+                  href="/boards"
+                >
+                  <div className="text-sm font-semibold">게시판</div>
+                  <div className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                    자료 공유
+                  </div>
+                </Link>
+              </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="hidden space-y-3 lg:block">
               <div className="grid gap-3">
                 <Link
                   className="rounded-[24px] border border-[var(--line)] bg-white/80 px-4 py-4"
@@ -93,15 +123,15 @@ export default async function HomePage() {
                 >
                   <div className="text-sm font-semibold">과목별 게시판</div>
                   <div className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
-                    정리 자료, 댓글, 첨부 파일까지 공유하기
+                    정리 자료, 댓글, 첨부 파일까지 같이 공유하기
                   </div>
                 </Link>
               </div>
-
-              <div className="sm:hidden">
-                <InstallShortcut />
-              </div>
             </div>
+          </div>
+
+          <div className="mt-4 sm:hidden">
+            <InstallShortcut />
           </div>
         </section>
 
@@ -109,10 +139,10 @@ export default async function HomePage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-                과목별 게시판
+                과목 바로가기
               </p>
               <h2 className="display-font mt-1 text-xl font-bold sm:text-2xl">
-                정리 자료 올리기
+                필요한 메뉴로 바로 이동
               </h2>
             </div>
             <Link
@@ -123,7 +153,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Link
               className="rounded-[24px] border border-[var(--line)] bg-white/82 px-4 py-4"
               href="/calendar"
@@ -148,6 +178,7 @@ export default async function HomePage() {
           </div>
         </section>
       </div>
+
       <MobileTabBar currentPath="/" />
     </main>
   );
