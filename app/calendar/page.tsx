@@ -18,7 +18,6 @@ import {
 } from "@/lib/calendar";
 import {
   listClassEventsInRange,
-  listUpcomingClassEvents,
   type ClassEventRecord,
 } from "@/lib/db";
 import { SUBJECTS } from "@/lib/subjects";
@@ -98,15 +97,18 @@ function buildEventsByDate(events: ClassEventRecord[]) {
 }
 
 function EventCard({
+  currentUserId,
   todayDateKey,
   currentUserIsAdmin,
   event,
 }: {
+  currentUserId: string | null;
   todayDateKey: string;
   currentUserIsAdmin: boolean;
   event: ClassEventRecord;
 }) {
   const ddayLabel = getEventDdayLabel(todayDateKey, event.startsOn, event.endsOn);
+  const canManage = currentUserIsAdmin || currentUserId === event.user.id;
 
   return (
     <article className="rounded-[24px] border border-[var(--line)] bg-white/84 p-4">
@@ -145,7 +147,7 @@ function EventCard({
         {event.description}
       </p>
 
-      {currentUserIsAdmin ? (
+      {canManage ? (
         <div className="mt-4 space-y-3">
           <details className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.7)] p-3">
             <summary className="cursor-pointer text-sm font-semibold">일정 수정</summary>
@@ -279,13 +281,9 @@ export default async function CalendarPage({ searchParams }: PageProps) {
       ? params.subject
       : "";
   const allMonthEvents = listClassEventsInRange(month.startDateKey, month.endDateKey);
-  const allUpcomingEvents = listUpcomingClassEvents(todayDateKey, 8);
   const monthEvents = selectedSubject
     ? allMonthEvents.filter((event) => event.subjectSlug === selectedSubject)
     : allMonthEvents;
-  const upcomingEvents = selectedSubject
-    ? allUpcomingEvents.filter((event) => event.subjectSlug === selectedSubject)
-    : allUpcomingEvents;
   const eventsByDate = buildEventsByDate(monthEvents);
 
   return (
@@ -308,7 +306,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
                 수행평가, 숙제, 준비물, 행사 일정을 날짜별로 모아보고 관리하는 페이지입니다.
-                일정은 관리자만 올리고, 반 아이들은 모두 확인할 수 있습니다.
+                로그인한 누구나 일정을 올릴 수 있고, 작성자 본인이나 관리자가 수정할 수 있습니다.
               </p>
             </div>
 
@@ -381,6 +379,31 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_380px] lg:gap-5">
           <section className="glass-panel overflow-hidden rounded-[28px]">
             <div className="border-b border-[var(--line)] px-4 py-4 sm:px-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <Link
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-white text-lg font-semibold"
+                  href={`/calendar?month=${month.prevMonthKey}${selectedSubject ? `&subject=${selectedSubject}` : ""}`}
+                >
+                  ‹
+                </Link>
+
+                <div className="text-center">
+                  <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                    월별 이동
+                  </p>
+                  <h2 className="display-font mt-1 text-xl font-bold sm:text-2xl">
+                    {month.monthLabel}
+                  </h2>
+                </div>
+
+                <Link
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-white text-lg font-semibold"
+                  href={`/calendar?month=${month.nextMonthKey}${selectedSubject ? `&subject=${selectedSubject}` : ""}`}
+                >
+                  ›
+                </Link>
+              </div>
+
               <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold tracking-[0.16em] text-[var(--muted)]">
                 {WEEKDAY_LABELS.map((label, index) => (
                   <div
@@ -457,66 +480,11 @@ export default async function CalendarPage({ searchParams }: PageProps) {
             </div>
           </section>
 
-          <aside className="space-y-4">
-            <section className="glass-panel rounded-[28px] p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-                    다가오는 일정
-                  </p>
-                  <h2 className="display-font mt-1 text-xl font-bold">이번 달 체크 포인트</h2>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {upcomingEvents.length > 0 ? (
-                  upcomingEvents.map((event) => (
-                    <div
-                      key={`upcoming-${event.id}`}
-                      className="rounded-[22px] border border-[var(--line)] bg-white/84 p-3.5"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getCategoryClasses(
-                            event.category,
-                          )}`}
-                        >
-                          {event.category}
-                        </span>
-                        <span className="text-[11px] font-semibold text-[var(--muted)]">
-                          {getSubjectLabel(event.subjectSlug)}
-                        </span>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getImportanceClasses(
-                            event.importance,
-                          )}`}
-                        >
-                          {getImportanceLabel(event.importance)}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold">{event.title}</div>
-                        <div className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold">
-                          {getEventDdayLabel(todayDateKey, event.startsOn, event.endsOn)}
-                        </div>
-                      </div>
-                      <div className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
-                        {formatEventDateRange(event.startsOn, event.endsOn)}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-[22px] border border-[var(--line)] bg-white/84 p-4 text-sm text-[var(--muted)]">
-                    등록된 일정이 아직 없습니다.
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {currentUserIsAdmin ? (
+          <aside>
+            {currentUser ? (
               <section className="glass-panel rounded-[28px] p-4 sm:p-5">
                 <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-                  관리자 등록
+                  일정 등록
                 </p>
                 <h2 className="display-font mt-1 text-xl font-bold">일정 올리기</h2>
 
@@ -618,7 +586,23 @@ export default async function CalendarPage({ searchParams }: PageProps) {
                   </button>
                 </form>
               </section>
-            ) : null}
+            ) : (
+              <section className="glass-panel rounded-[28px] p-4 sm:p-5">
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                  일정 등록
+                </p>
+                <h2 className="display-font mt-1 text-xl font-bold">로그인 후 작성 가능</h2>
+                <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+                  로그인하면 시험, 숙제, 준비물 같은 일정을 직접 올릴 수 있습니다.
+                </p>
+                <a
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#191600]"
+                  href="/api/auth/kakao/start?returnTo=/calendar"
+                >
+                  카카오로 로그인
+                </a>
+              </section>
+            )}
           </aside>
         </div>
 
@@ -645,6 +629,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
               monthEvents.map((event) => (
                 <EventCard
                   key={event.id}
+                  currentUserId={currentUser?.id ?? null}
                   currentUserIsAdmin={currentUserIsAdmin}
                   event={event}
                   todayDateKey={todayDateKey}
