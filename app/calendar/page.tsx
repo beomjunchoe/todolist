@@ -26,7 +26,7 @@ type PageProps = {
   }>;
 };
 
-const CATEGORY_OPTIONS = ["시험", "숙제", "준비물", "행사", "기타"];
+const CATEGORY_OPTIONS = ["시험", "숙제", "준비물", "행사", "생일", "기타"];
 const IMPORTANCE_OPTIONS = [
   { value: "high", label: "높음" },
   { value: "medium", label: "보통" },
@@ -52,6 +52,8 @@ function getCategoryClasses(category: string) {
       return "bg-[rgba(88,144,255,0.12)] text-[rgb(54,92,166)]";
     case "행사":
       return "bg-[rgba(57,168,115,0.14)] text-[rgb(41,123,84)]";
+    case "생일":
+      return "bg-[rgba(255,105,180,0.16)] text-[rgb(176,40,112)]";
     default:
       return "bg-[rgba(19,34,29,0.08)] text-[var(--foreground)]";
   }
@@ -101,7 +103,7 @@ function EventCreateForm({ todayDateKey }: { todayDateKey: string }) {
         <input
           className="w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
           name="title"
-          placeholder="예: 수학 수행평가"
+          placeholder="예: 민지 생일"
           required
           type="text"
         />
@@ -638,7 +640,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
                 </p>
                 <h2 className="display-font mt-1 text-xl font-bold">로그인 후 작성 가능</h2>
                 <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-                  로그인하면 시험, 숙제, 준비물 같은 일정을 직접 올릴 수 있습니다.
+                  로그인하면 시험, 숙제, 준비물, 생일 같은 일정을 직접 올릴 수 있습니다.
                 </p>
                 <a
                   className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#191600]"
