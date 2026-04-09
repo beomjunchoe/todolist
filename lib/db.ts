@@ -59,6 +59,20 @@ export type BoardPostRecord = {
   comments: BoardCommentRecord[];
 };
 
+export type ClassEventRecord = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  importance: "high" | "medium" | "low";
+  subjectSlug: string | null;
+  startsOn: string;
+  endsOn: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: Pick<DbUser, "id" | "nickname">;
+};
+
 type BoardPostPermissionRecord = {
   attachmentPath: string | null;
   id: string;
@@ -71,6 +85,11 @@ type BoardCommentPermissionRecord = {
   id: string;
   postId: string;
   postSubjectSlug: string;
+  userId: string;
+};
+
+type ClassEventPermissionRecord = {
+  id: string;
   userId: string;
 };
 
@@ -199,12 +218,29 @@ function createDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS class_events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      category TEXT NOT NULL,
+      importance TEXT NOT NULL DEFAULT 'medium',
+      subject_slug TEXT,
+      starts_on TEXT NOT NULL,
+      ends_on TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_todo_items_user_id_created_at ON todo_items(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_todo_checks_date_key ON todo_checks(date_key);
     CREATE INDEX IF NOT EXISTS idx_board_posts_subject_created_at ON board_posts(subject_slug, is_notice DESC, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_board_comments_post_created_at ON board_comments(post_id, created_at ASC);
     CREATE INDEX IF NOT EXISTS idx_board_post_likes_post_id ON board_post_likes(post_id);
+    CREATE INDEX IF NOT EXISTS idx_class_events_starts_on ON class_events(starts_on, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_class_events_subject_slug ON class_events(subject_slug, starts_on);
   `);
 
   const todoItemColumns = db
@@ -233,6 +269,14 @@ function createDatabase() {
   }
   if (!boardPostColumns.some((column) => column.name === "attachment_size")) {
     db.exec("ALTER TABLE board_posts ADD COLUMN attachment_size INTEGER");
+  }
+
+  const classEventColumns = db
+    .prepare("PRAGMA table_info(class_events)")
+    .all() as { name: string }[];
+
+  if (!classEventColumns.some((column) => column.name === "importance")) {
+    db.exec("ALTER TABLE class_events ADD COLUMN importance TEXT NOT NULL DEFAULT 'medium'");
   }
 
   return db;
@@ -843,6 +887,137 @@ export function toggleBoardPostLike(userId: string, postId: string) {
   ).run(randomUUID(), postId, userId, new Date().toISOString());
 }
 
+export function createClassEvent(input: {
+  userId: string;
+  title: string;
+  description: string;
+  category: string;
+  importance: "high" | "medium" | "low";
+  subjectSlug?: string | null;
+  startsOn: string;
+  endsOn?: string | null;
+}) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `
+      INSERT INTO class_events (
+        id,
+        user_id,
+        title,
+        description,
+        category,
+        importance,
+        subject_slug,
+        starts_on,
+        ends_on,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+  ).run(
+    randomUUID(),
+    input.userId,
+    input.title,
+    input.description,
+    input.category,
+    input.importance,
+    input.subjectSlug ?? null,
+    input.startsOn,
+    input.endsOn ?? null,
+    now,
+    now,
+  );
+}
+
+function getClassEventPermissionRecord(eventId: string) {
+  const db = getDatabase();
+
+  return db
+    .prepare(
+      `
+        SELECT id, user_id
+        FROM class_events
+        WHERE id = ?
+      `,
+    )
+    .get(eventId) as ClassEventPermissionRecord | undefined;
+}
+
+export function updateClassEvent(input: {
+  actorUserId: string;
+  eventId: string;
+  title: string;
+  description: string;
+  category: string;
+  importance: "high" | "medium" | "low";
+  subjectSlug?: string | null;
+  startsOn: string;
+  endsOn?: string | null;
+  isAdmin: boolean;
+}) {
+  const db = getDatabase();
+  const event = getClassEventPermissionRecord(input.eventId);
+
+  if (!event) {
+    return null;
+  }
+
+  if (!input.isAdmin && event.userId !== input.actorUserId) {
+    return null;
+  }
+
+  db.prepare(
+    `
+      UPDATE class_events
+      SET
+        title = ?,
+        description = ?,
+        category = ?,
+        importance = ?,
+        subject_slug = ?,
+        starts_on = ?,
+        ends_on = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+  ).run(
+    input.title,
+    input.description,
+    input.category,
+    input.importance,
+    input.subjectSlug ?? null,
+    input.startsOn,
+    input.endsOn ?? null,
+    new Date().toISOString(),
+    event.id,
+  );
+
+  return event;
+}
+
+export function deleteClassEvent(input: {
+  actorUserId: string;
+  eventId: string;
+  isAdmin: boolean;
+}) {
+  const db = getDatabase();
+  const event = getClassEventPermissionRecord(input.eventId);
+
+  if (!event) {
+    return null;
+  }
+
+  if (!input.isAdmin && event.userId !== input.actorUserId) {
+    return null;
+  }
+
+  db.prepare("DELETE FROM class_events WHERE id = ?").run(event.id);
+  return event;
+}
+
 function listChecksByTodo(weekKeys: string[]) {
   const db = getDatabase();
   const checks = weekKeys.length
@@ -1006,6 +1181,142 @@ export function listUserStarTotals() {
   }
 
   return userStarTotals;
+}
+
+export function listClassEventsInRange(
+  startDateKey: string,
+  endDateKey: string,
+): ClassEventRecord[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          class_events.id,
+          class_events.title,
+          class_events.description,
+          class_events.category,
+          class_events.importance,
+          class_events.subject_slug,
+          class_events.starts_on,
+          class_events.ends_on,
+          class_events.created_at,
+          class_events.updated_at,
+          users.id AS user_id,
+          users.nickname
+        FROM class_events
+        INNER JOIN users ON users.id = class_events.user_id
+        WHERE class_events.starts_on <= ?
+          AND COALESCE(class_events.ends_on, class_events.starts_on) >= ?
+        ORDER BY
+          class_events.starts_on ASC,
+          CASE class_events.importance
+            WHEN 'high' THEN 0
+            WHEN 'medium' THEN 1
+            ELSE 2
+          END ASC,
+          class_events.updated_at DESC
+      `,
+    )
+    .all(endDateKey, startDateKey) as {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    importance: "high" | "medium" | "low";
+    subject_slug: string | null;
+    starts_on: string;
+    ends_on: string | null;
+    created_at: string;
+    updated_at: string;
+    user_id: string;
+    nickname: string;
+  }[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    category: row.category,
+    importance: row.importance,
+    subjectSlug: row.subject_slug,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    user: {
+      id: row.user_id,
+      nickname: row.nickname,
+    },
+  }));
+}
+
+export function listUpcomingClassEvents(
+  startDateKey: string,
+  limit = 10,
+): ClassEventRecord[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          class_events.id,
+          class_events.title,
+          class_events.description,
+          class_events.category,
+          class_events.importance,
+          class_events.subject_slug,
+          class_events.starts_on,
+          class_events.ends_on,
+          class_events.created_at,
+          class_events.updated_at,
+          users.id AS user_id,
+          users.nickname
+        FROM class_events
+        INNER JOIN users ON users.id = class_events.user_id
+        WHERE COALESCE(class_events.ends_on, class_events.starts_on) >= ?
+        ORDER BY
+          class_events.starts_on ASC,
+          CASE class_events.importance
+            WHEN 'high' THEN 0
+            WHEN 'medium' THEN 1
+            ELSE 2
+          END ASC,
+          class_events.updated_at DESC
+        LIMIT ?
+      `,
+    )
+    .all(startDateKey, limit) as {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    importance: "high" | "medium" | "low";
+    subject_slug: string | null;
+    starts_on: string;
+    ends_on: string | null;
+    created_at: string;
+    updated_at: string;
+    user_id: string;
+    nickname: string;
+  }[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    category: row.category,
+    importance: row.importance,
+    subjectSlug: row.subject_slug,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    user: {
+      id: row.user_id,
+      nickname: row.nickname,
+    },
+  }));
 }
 
 export function listBoardPostsBySubject(

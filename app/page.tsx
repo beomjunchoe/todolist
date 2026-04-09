@@ -46,6 +46,12 @@ export default async function HomePage() {
                 </Link>
                 <Link
                   className="flex items-center justify-center rounded-full border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold"
+                  href="/calendar"
+                >
+                  일정 캘린더 보기
+                </Link>
+                <Link
+                  className="flex items-center justify-center rounded-full border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold"
                   href="/boards"
                 >
                   과목별 게시판 보기
@@ -70,6 +76,15 @@ export default async function HomePage() {
                   <div className="text-sm font-semibold">공유형 투두리스트</div>
                   <div className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
                     주간 체크와 누적 별을 한 화면에서 보기
+                  </div>
+                </Link>
+                <Link
+                  className="rounded-[24px] border border-[var(--line)] bg-white/80 px-4 py-4"
+                  href="/calendar"
+                >
+                  <div className="text-sm font-semibold">학급 일정 캘린더</div>
+                  <div className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
+                    수행평가, 준비물, 시험 일정을 날짜별로 한눈에 보기
                   </div>
                 </Link>
                 <Link
@@ -109,6 +124,15 @@ export default async function HomePage() {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Link
+              className="rounded-[24px] border border-[var(--line)] bg-white/82 px-4 py-4"
+              href="/calendar"
+            >
+              <div className="text-sm font-semibold">학급 일정</div>
+              <div className="mt-1 text-[12px] leading-6 text-[var(--muted)]">
+                시험, 숙제, 행사 일정 모아보기
+              </div>
+            </Link>
             {SUBJECTS.map((subject) => (
               <Link
                 key={subject.slug}

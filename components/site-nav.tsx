@@ -14,12 +14,13 @@ export function SiteNav({
   const links = [
     { href: "/", label: "메인" },
     { href: "/todo", label: "투두" },
+    { href: "/calendar", label: "일정" },
     { href: "/boards", label: "게시판" },
   ];
 
   return (
     <div className="glass-panel rounded-[22px] px-3 py-3 sm:rounded-[24px] sm:px-4">
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
+      <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
         {links.map((link) => {
           const active = currentPath === link.href;
 

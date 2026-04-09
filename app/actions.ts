@@ -10,15 +10,18 @@ import {
 } from "@/lib/auth";
 import {
   completeTodoItemForUser,
+  createClassEvent as createClassEventRecord,
   createBoardComment as createBoardCommentRecord,
   createBoardPost as createBoardPostRecord,
   createTodoItem,
+  deleteClassEvent as deleteClassEventRecord,
   deleteBoardComment,
   deleteBoardPost,
   deleteTodoItemById,
   deleteTodoItemForUser,
   toggleBoardPostLike,
   toggleTodoCheckForUser,
+  updateClassEvent as updateClassEventRecord,
   updateBoardComment,
   updateBoardPost,
   updateTodoItemForUser,
@@ -59,6 +62,10 @@ function revalidateBoardPages(subjectSlug?: string) {
   if (subjectSlug) {
     revalidatePath(`/boards/${subjectSlug}`);
   }
+}
+
+function revalidateCalendarPages() {
+  revalidatePath("/calendar");
 }
 
 export async function createTodo(formData: FormData) {
@@ -309,6 +316,92 @@ export async function deleteBoardCommentAction(formData: FormData) {
   });
 
   revalidateBoardPages(subjectSlug);
+}
+
+function normalizeDateKey(value: FormDataEntryValue | null) {
+  const dateKey = `${value ?? ""}`.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : "";
+}
+
+function normalizeImportance(value: FormDataEntryValue | null) {
+  const importance = `${value ?? ""}`.trim();
+  return importance === "high" || importance === "low" ? importance : "medium";
+}
+
+export async function createClassEventAction(formData: FormData) {
+  const user = await requireAdminUser();
+  const title = `${formData.get("title") ?? ""}`.trim();
+  const description = `${formData.get("description") ?? ""}`.trim();
+  const category = `${formData.get("category") ?? ""}`.trim() || "기타";
+  const importance = normalizeImportance(formData.get("importance"));
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim() || null;
+  const startsOn = normalizeDateKey(formData.get("startsOn"));
+  const endsOn = normalizeDateKey(formData.get("endsOn")) || null;
+
+  if (!title || !description || !startsOn) {
+    return;
+  }
+
+  createClassEventRecord({
+    category: category.slice(0, 20),
+    description: description.slice(0, 2000),
+    endsOn: endsOn && endsOn >= startsOn ? endsOn : null,
+    importance,
+    startsOn,
+    subjectSlug,
+    title: title.slice(0, 100),
+    userId: user.id,
+  });
+
+  revalidateCalendarPages();
+}
+
+export async function updateClassEventAction(formData: FormData) {
+  const user = await requireAdminUser();
+  const eventId = `${formData.get("eventId") ?? ""}`.trim();
+  const title = `${formData.get("title") ?? ""}`.trim();
+  const description = `${formData.get("description") ?? ""}`.trim();
+  const category = `${formData.get("category") ?? ""}`.trim() || "기타";
+  const importance = normalizeImportance(formData.get("importance"));
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim() || null;
+  const startsOn = normalizeDateKey(formData.get("startsOn"));
+  const endsOn = normalizeDateKey(formData.get("endsOn")) || null;
+
+  if (!eventId || !title || !description || !startsOn) {
+    return;
+  }
+
+  updateClassEventRecord({
+    actorUserId: user.id,
+    category: category.slice(0, 20),
+    description: description.slice(0, 2000),
+    endsOn: endsOn && endsOn >= startsOn ? endsOn : null,
+    eventId,
+    importance,
+    isAdmin: true,
+    startsOn,
+    subjectSlug,
+    title: title.slice(0, 100),
+  });
+
+  revalidateCalendarPages();
+}
+
+export async function deleteClassEventAction(formData: FormData) {
+  const user = await requireAdminUser();
+  const eventId = `${formData.get("eventId") ?? ""}`.trim();
+
+  if (!eventId) {
+    return;
+  }
+
+  deleteClassEventRecord({
+    actorUserId: user.id,
+    eventId,
+    isAdmin: true,
+  });
+
+  revalidateCalendarPages();
 }
 
 export async function signOut() {
