@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import {
   createBoardComment,
   createBoardPost,
+  deleteBoardCommentAction,
   deleteBoardPostAction,
   toggleBoardLikeAction,
+  updateBoardCommentAction,
   updateBoardPostAction,
 } from "@/app/actions";
 import { AdminBadge } from "@/components/badges";
@@ -17,6 +19,10 @@ import { getSubjectBySlug } from "@/lib/subjects";
 type PageProps = {
   params: Promise<{
     subject: string;
+  }>;
+  searchParams?: Promise<{
+    notice?: string | string[];
+    q?: string | string[];
   }>;
 };
 
@@ -32,17 +38,30 @@ function formatFileSize(bytes: number) {
   return `${bytes}B`;
 }
 
-export default async function SubjectBoardPage({ params }: PageProps) {
+function getSingleParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function SubjectBoardPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { subject: subjectSlug } = await params;
+  const query = searchParams ? await searchParams : undefined;
   const subject = getSubjectBySlug(subjectSlug);
 
   if (!subject) {
     notFound();
   }
 
+  const search = getSingleParam(query?.q)?.trim() ?? "";
+  const noticeOnly = getSingleParam(query?.notice) === "1";
   const currentUser = await getCurrentUser();
   const currentUserIsAdmin = isAdminUser(currentUser);
-  const posts = listBoardPostsBySubject(subject.slug, currentUser?.id);
+  const posts = listBoardPostsBySubject(subject.slug, currentUser?.id, {
+    noticeOnly,
+    search,
+  });
 
   return (
     <main className="min-h-screen px-3 py-4 sm:px-6 lg:px-8">
@@ -79,6 +98,43 @@ export default async function SubjectBoardPage({ params }: PageProps) {
                 카카오로 로그인
               </a>
             ) : null}
+          </div>
+        </section>
+
+        <section className="glass-panel rounded-[28px] p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                게시판 보기
+              </p>
+              <h2 className="mt-1 text-lg font-semibold">검색과 필터</h2>
+            </div>
+
+            <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <input
+                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
+                defaultValue={search}
+                name="q"
+                placeholder="제목 또는 내용 검색"
+                type="search"
+              />
+              <label className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-4 py-3 text-xs font-semibold">
+                <input
+                  className="h-4 w-4 accent-[var(--accent)]"
+                  defaultChecked={noticeOnly}
+                  name="notice"
+                  type="checkbox"
+                  value="1"
+                />
+                공지글만 보기
+              </label>
+              <button
+                className="rounded-full bg-[var(--foreground)] px-4 py-3 text-xs font-semibold text-white"
+                type="submit"
+              >
+                적용
+              </button>
+            </form>
           </div>
         </section>
 
@@ -153,7 +209,7 @@ export default async function SubjectBoardPage({ params }: PageProps) {
         <section className="space-y-4">
           {posts.length > 0 ? (
             posts.map((post) => {
-              const canManage =
+              const canManagePost =
                 Boolean(currentUser) &&
                 (currentUserIsAdmin || currentUser?.id === post.user.id);
 
@@ -223,7 +279,7 @@ export default async function SubjectBoardPage({ params }: PageProps) {
                       </span>
                     )}
 
-                    {canManage ? (
+                    {canManagePost ? (
                       <details className="rounded-[20px] border border-[var(--line)] bg-white px-4 py-3 text-sm">
                         <summary className="cursor-pointer list-none font-semibold">
                           게시글 수정
@@ -297,7 +353,7 @@ export default async function SubjectBoardPage({ params }: PageProps) {
                       </details>
                     ) : null}
 
-                    {canManage ? (
+                    {canManagePost ? (
                       <form action={deleteBoardPostAction}>
                         <input name="postId" type="hidden" value={post.id} />
                         <input
@@ -322,24 +378,91 @@ export default async function SubjectBoardPage({ params }: PageProps) {
 
                     <div className="mt-3 space-y-3">
                       {post.comments.length > 0 ? (
-                        post.comments.map((comment) => (
-                          <div
-                            key={comment.id}
-                            className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-[12px] font-semibold">
-                                {comment.user.nickname}
+                        post.comments.map((comment) => {
+                          const canManageComment =
+                            Boolean(currentUser) &&
+                            (currentUserIsAdmin ||
+                              currentUser?.id === comment.user.id);
+
+                          return (
+                            <div
+                              key={comment.id}
+                              className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="text-[12px] font-semibold">
+                                  {comment.user.nickname}
+                                </div>
+                                <div className="text-[11px] text-[var(--muted)]">
+                                  {new Date(comment.createdAt).toLocaleString("ko-KR")}
+                                  {comment.updatedAt !== comment.createdAt
+                                    ? ` · 수정 ${new Date(comment.updatedAt).toLocaleString("ko-KR")}`
+                                    : ""}
+                                </div>
                               </div>
-                              <div className="text-[11px] text-[var(--muted)]">
-                                {new Date(comment.createdAt).toLocaleString("ko-KR")}
-                              </div>
+                              <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                                {comment.content}
+                              </p>
+
+                              {canManageComment ? (
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                  <details className="rounded-[18px] border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-xs">
+                                    <summary className="cursor-pointer list-none font-semibold">
+                                      댓글 수정
+                                    </summary>
+                                    <form
+                                      action={updateBoardCommentAction}
+                                      className="mt-3 space-y-3"
+                                    >
+                                      <input
+                                        name="commentId"
+                                        type="hidden"
+                                        value={comment.id}
+                                      />
+                                      <input
+                                        name="subjectSlug"
+                                        type="hidden"
+                                        value={subject.slug}
+                                      />
+                                      <textarea
+                                        className="min-h-[92px] w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
+                                        defaultValue={comment.content}
+                                        maxLength={2000}
+                                        name="content"
+                                        required
+                                      />
+                                      <button
+                                        className="rounded-full bg-[var(--foreground)] px-4 py-2 text-xs font-semibold text-white"
+                                        type="submit"
+                                      >
+                                        댓글 수정 저장
+                                      </button>
+                                    </form>
+                                  </details>
+
+                                  <form action={deleteBoardCommentAction}>
+                                    <input
+                                      name="commentId"
+                                      type="hidden"
+                                      value={comment.id}
+                                    />
+                                    <input
+                                      name="subjectSlug"
+                                      type="hidden"
+                                      value={subject.slug}
+                                    />
+                                    <button
+                                      className="rounded-full border border-[rgba(179,51,51,0.2)] bg-[rgba(179,51,51,0.08)] px-3 py-2 text-xs font-semibold text-[#8e2525]"
+                                      type="submit"
+                                    >
+                                      댓글 삭제
+                                    </button>
+                                  </form>
+                                </div>
+                              ) : null}
                             </div>
-                            <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
-                              {comment.content}
-                            </p>
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <p className="text-sm text-[var(--muted)]">
                           아직 댓글이 없습니다.
@@ -384,8 +507,8 @@ export default async function SubjectBoardPage({ params }: PageProps) {
           ) : (
             <section className="glass-panel rounded-[28px] p-8">
               <p className="text-sm leading-7 text-[var(--muted)]">
-                아직 등록된 게시글이 없습니다. 첫 글을 올려서 이 과목 게시판을
-                시작해 보세요.
+                조건에 맞는 게시글이 없습니다. 검색어를 바꾸거나 공지글 필터를
+                해제해 보세요.
               </p>
             </section>
           )}

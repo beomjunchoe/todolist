@@ -13,11 +13,13 @@ import {
   createBoardComment as createBoardCommentRecord,
   createBoardPost as createBoardPostRecord,
   createTodoItem,
+  deleteBoardComment,
   deleteBoardPost,
   deleteTodoItemById,
   deleteTodoItemForUser,
   toggleBoardPostLike,
   toggleTodoCheckForUser,
+  updateBoardComment,
   updateBoardPost,
   updateTodoItemForUser,
 } from "@/lib/db";
@@ -266,6 +268,44 @@ export async function createBoardComment(formData: FormData) {
     content: content.slice(0, 2000),
     postId,
     userId: user.id,
+  });
+
+  revalidateBoardPages(subjectSlug);
+}
+
+export async function updateBoardCommentAction(formData: FormData) {
+  const user = await requireSignedInUser();
+  const commentId = `${formData.get("commentId") ?? ""}`.trim();
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+  const content = `${formData.get("content") ?? ""}`.trim();
+
+  if (!commentId || !getSubjectBySlug(subjectSlug) || !content) {
+    return;
+  }
+
+  updateBoardComment({
+    actorUserId: user.id,
+    commentId,
+    content: content.slice(0, 2000),
+    isAdmin: isAdminUser(user),
+  });
+
+  revalidateBoardPages(subjectSlug);
+}
+
+export async function deleteBoardCommentAction(formData: FormData) {
+  const user = await requireSignedInUser();
+  const commentId = `${formData.get("commentId") ?? ""}`.trim();
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+
+  if (!commentId || !getSubjectBySlug(subjectSlug)) {
+    return;
+  }
+
+  deleteBoardComment({
+    actorUserId: user.id,
+    commentId,
+    isAdmin: isAdminUser(user),
   });
 
   revalidateBoardPages(subjectSlug);

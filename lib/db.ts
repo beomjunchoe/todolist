@@ -40,6 +40,7 @@ export type BoardCommentRecord = {
   content: string;
   createdAt: string;
   postId: string;
+  updatedAt: string;
   user: Pick<DbUser, "id" | "nickname">;
 };
 
@@ -63,6 +64,13 @@ type BoardPostPermissionRecord = {
   id: string;
   isNotice: boolean;
   subjectSlug: string;
+  userId: string;
+};
+
+type BoardCommentPermissionRecord = {
+  id: string;
+  postId: string;
+  postSubjectSlug: string;
   userId: string;
 };
 
@@ -722,6 +730,80 @@ export function createBoardComment(input: {
   ).run(randomUUID(), input.postId, input.userId, input.content, now, now);
 }
 
+function getBoardCommentPermissionRecord(commentId: string) {
+  const db = getDatabase();
+
+  return db
+    .prepare(
+      `
+        SELECT
+          board_comments.id,
+          board_comments.post_id,
+          board_comments.user_id,
+          board_posts.subject_slug AS post_subject_slug
+        FROM board_comments
+        INNER JOIN board_posts ON board_posts.id = board_comments.post_id
+        WHERE board_comments.id = ?
+      `,
+    )
+    .get(commentId) as BoardCommentPermissionRecord | undefined;
+}
+
+export function updateBoardComment(input: {
+  actorUserId: string;
+  commentId: string;
+  content: string;
+  isAdmin: boolean;
+}) {
+  const db = getDatabase();
+  const comment = getBoardCommentPermissionRecord(input.commentId);
+
+  if (!comment) {
+    return null;
+  }
+
+  if (!input.isAdmin && comment.userId !== input.actorUserId) {
+    return null;
+  }
+
+  db.prepare(
+    `
+      UPDATE board_comments
+      SET content = ?, updated_at = ?
+      WHERE id = ?
+    `,
+  ).run(input.content, new Date().toISOString(), comment.id);
+
+  return {
+    postId: comment.postId,
+    subjectSlug: comment.postSubjectSlug,
+  };
+}
+
+export function deleteBoardComment(input: {
+  actorUserId: string;
+  commentId: string;
+  isAdmin: boolean;
+}) {
+  const db = getDatabase();
+  const comment = getBoardCommentPermissionRecord(input.commentId);
+
+  if (!comment) {
+    return null;
+  }
+
+  if (!input.isAdmin && comment.userId !== input.actorUserId) {
+    return null;
+  }
+
+  db.prepare("DELETE FROM board_comments WHERE id = ?").run(comment.id);
+
+  return {
+    postId: comment.postId,
+    subjectSlug: comment.postSubjectSlug,
+  };
+}
+
 export function toggleBoardPostLike(userId: string, postId: string) {
   const db = getDatabase();
   const post = db
@@ -929,8 +1011,25 @@ export function listUserStarTotals() {
 export function listBoardPostsBySubject(
   subjectSlug: string,
   currentUserId?: string | null,
+  options?: {
+    noticeOnly?: boolean;
+    search?: string;
+  },
 ): BoardPostRecord[] {
   const db = getDatabase();
+  const whereClauses = ["board_posts.subject_slug = ?"];
+  const params: (string | number)[] = [subjectSlug];
+
+  if (options?.noticeOnly) {
+    whereClauses.push("board_posts.is_notice = 1");
+  }
+
+  if (options?.search) {
+    whereClauses.push("(board_posts.title LIKE ? OR board_posts.content LIKE ?)");
+    const pattern = `%${options.search}%`;
+    params.push(pattern, pattern);
+  }
+
   const posts = db
     .prepare(
       `
@@ -949,11 +1048,11 @@ export function listBoardPostsBySubject(
           users.nickname
         FROM board_posts
         INNER JOIN users ON users.id = board_posts.user_id
-        WHERE board_posts.subject_slug = ?
+        WHERE ${whereClauses.join(" AND ")}
         ORDER BY board_posts.is_notice DESC, board_posts.created_at DESC
       `,
     )
-    .all(subjectSlug) as {
+    .all(...params) as {
     id: string;
     subject_slug: string;
     title: string;
@@ -981,6 +1080,7 @@ export function listBoardPostsBySubject(
           board_comments.post_id,
           board_comments.content,
           board_comments.created_at,
+          board_comments.updated_at,
           users.id AS user_id,
           users.nickname
         FROM board_comments
@@ -994,6 +1094,7 @@ export function listBoardPostsBySubject(
     post_id: string;
     content: string;
     created_at: string;
+    updated_at: string;
     user_id: string;
     nickname: string;
   }[];
@@ -1019,6 +1120,7 @@ export function listBoardPostsBySubject(
       content: comment.content,
       createdAt: comment.created_at,
       postId: comment.post_id,
+      updatedAt: comment.updated_at,
       user: {
         id: comment.user_id,
         nickname: comment.nickname,
