@@ -10,6 +10,7 @@ import {
 
 export const SESSION_COOKIE_NAME = "shared_todo_session";
 export const KAKAO_STATE_COOKIE_NAME = "shared_todo_kakao_state";
+export const KAKAO_RETURN_TO_COOKIE_NAME = "shared_todo_kakao_return_to";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 14;
 
 export function buildCookieOptions(expires: Date) {
@@ -126,4 +127,12 @@ export function buildKakaoAuthorizeUrl(state: string) {
 
 export function buildStateCookieOptions() {
   return buildCookieOptions(new Date(Date.now() + 1000 * 60 * 10));
+}
+
+export function normalizeReturnToPath(value: string | null | undefined) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/";
+  }
+
+  return value;
 }

@@ -18,6 +18,14 @@ function isIosUserAgent() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
+function isKakaoInAppBrowser() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return /kakaotalk/i.test(navigator.userAgent);
+}
+
 function isStandalone() {
   if (typeof window === "undefined") {
     return false;
@@ -33,6 +41,8 @@ export function InstallShortcut() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showIosGuide, setShowIosGuide] = useState(false);
+  const [showKakaoGuide, setShowKakaoGuide] = useState(false);
+  const [showGenericGuide, setShowGenericGuide] = useState(false);
   const [installed, setInstalled] = useState(() => isStandalone());
 
   useEffect(() => {
@@ -56,6 +66,13 @@ export function InstallShortcut() {
   }, []);
 
   async function handleInstall() {
+    if (isKakaoInAppBrowser()) {
+      setShowKakaoGuide((value) => !value);
+      setShowIosGuide(false);
+      setShowGenericGuide(false);
+      return;
+    }
+
     if (deferredPrompt) {
       await deferredPrompt.prompt();
       await deferredPrompt.userChoice;
@@ -65,10 +82,14 @@ export function InstallShortcut() {
 
     if (isIosUserAgent()) {
       setShowIosGuide((value) => !value);
+      setShowKakaoGuide(false);
+      setShowGenericGuide(false);
       return;
     }
 
-    setShowIosGuide((value) => !value);
+    setShowGenericGuide((value) => !value);
+    setShowIosGuide(false);
+    setShowKakaoGuide(false);
   }
 
   if (installed) {
@@ -104,11 +125,27 @@ export function InstallShortcut() {
         </button>
       </div>
 
+      {showKakaoGuide ? (
+        <div className="mt-3 rounded-2xl bg-[rgba(255,255,255,0.86)] px-3 py-3 text-[11px] leading-6 text-[var(--muted)]">
+          카카오톡 안에서는 홈 화면 추가가 바로 되지 않습니다.
+          <br />
+          카톡 우상단 메뉴에서 외부 브라우저로 연 뒤 다시 홈 화면 추가를 눌러 주세요.
+        </div>
+      ) : null}
+
       {showIosGuide ? (
         <div className="mt-3 rounded-2xl bg-[rgba(255,255,255,0.86)] px-3 py-3 text-[11px] leading-6 text-[var(--muted)]">
           아이폰 사파리에서는 자동 설치 창이 안 뜰 수 있습니다. 아래 순서로 추가하면 됩니다.
           <br />
           사파리 하단 공유 버튼 → 홈 화면에 추가
+        </div>
+      ) : null}
+
+      {showGenericGuide ? (
+        <div className="mt-3 rounded-2xl bg-[rgba(255,255,255,0.86)] px-3 py-3 text-[11px] leading-6 text-[var(--muted)]">
+          이 브라우저에서는 설치 창이 바로 안 뜰 수 있습니다.
+          <br />
+          크롬 또는 사파리에서 열고 브라우저 메뉴의 홈 화면 추가를 사용해 주세요.
         </div>
       ) : null}
     </div>

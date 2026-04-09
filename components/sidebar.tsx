@@ -1,6 +1,5 @@
 import { createTodo, signOut } from "@/app/actions";
 import { type TodoWithChecksRecord } from "@/lib/db";
-import { InstallShortcut } from "./install-shortcut";
 
 import { AdminBadge, StarBadge } from "./badges";
 import { SidebarTodoItem } from "./sidebar-todo-item";
@@ -16,8 +15,6 @@ export function Sidebar({
   totalStars: number;
   myTodos: TodoWithChecksRecord[];
 }) {
-  const completedCount = totalStars;
-
   return (
     <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
       <section className="glass-panel rounded-[28px] p-5">
@@ -28,7 +25,7 @@ export function Sidebar({
             </p>
             <div className="mt-2 flex items-center gap-2">
               <h2 className="display-font text-xl font-bold">{currentUserName}</h2>
-              {completedCount > 0 ? <StarBadge count={completedCount} /> : null}
+              {totalStars > 0 ? <StarBadge count={totalStars} /> : null}
               {isAdmin ? <AdminBadge /> : null}
             </div>
           </div>
@@ -43,8 +40,8 @@ export function Sidebar({
         </div>
 
         <p className="mt-3 text-xs leading-6 text-[var(--muted)]">
-          왼쪽에서는 할 일을 만들고 수정합니다. 주간 체크는 오른쪽 표에서 내 행만 직접
-          누를 수 있습니다.
+          왼쪽에서 할 일을 만들고 수정합니다. 주간 체크는 오른쪽 메인 표에서
+          자기 행만 직접 누를 수 있습니다.
         </p>
       </section>
 
@@ -92,10 +89,6 @@ export function Sidebar({
           )}
         </div>
       </section>
-
-      <div className="sm:hidden">
-        <InstallShortcut />
-      </div>
     </aside>
   );
 }

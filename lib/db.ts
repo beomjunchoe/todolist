@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 
 import Database from "better-sqlite3";
+
 import { countStarsByTodo } from "@/lib/todo-helpers";
 
 export type DbUser = {
@@ -27,6 +28,44 @@ export type BoardTodoRecord = TodoWithChecksRecord & {
   user: Pick<DbUser, "nickname" | "profileImage">;
 };
 
+export type BoardAttachmentRecord = {
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  postId: string;
+};
+
+export type BoardCommentRecord = {
+  id: string;
+  content: string;
+  createdAt: string;
+  postId: string;
+  user: Pick<DbUser, "id" | "nickname">;
+};
+
+export type BoardPostRecord = {
+  id: string;
+  attachment: BoardAttachmentRecord | null;
+  content: string;
+  createdAt: string;
+  isLikedByCurrentUser: boolean;
+  isNotice: boolean;
+  likeCount: number;
+  subjectSlug: string;
+  title: string;
+  updatedAt: string;
+  user: Pick<DbUser, "id" | "nickname">;
+  comments: BoardCommentRecord[];
+};
+
+type BoardPostPermissionRecord = {
+  attachmentPath: string | null;
+  id: string;
+  isNotice: boolean;
+  subjectSlug: string;
+  userId: string;
+};
+
 function resolveDatabasePath() {
   const url = process.env.DATABASE_URL ?? "file:./dev.db";
 
@@ -45,6 +84,10 @@ function resolveDatabasePath() {
     /* turbopackIgnore: true */ process.cwd(),
     normalizedPath.replace(/^\.\//, ""),
   );
+}
+
+export function getBoardUploadsDirectory() {
+  return path.join(path.dirname(resolveDatabasePath()), "board_uploads");
 }
 
 function mapUser(row: {
@@ -68,6 +111,7 @@ function mapUser(row: {
 function createDatabase() {
   const databasePath = resolveDatabasePath();
   fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+  fs.mkdirSync(getBoardUploadsDirectory(), { recursive: true });
 
   const db = new Database(databasePath, { timeout: 5000 });
   db.pragma("foreign_keys = ON");
@@ -110,9 +154,49 @@ function createDatabase() {
       FOREIGN KEY (todo_id) REFERENCES todo_items(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS board_posts (
+      id TEXT PRIMARY KEY,
+      subject_slug TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      is_notice INTEGER NOT NULL DEFAULT 0,
+      attachment_name TEXT,
+      attachment_path TEXT,
+      attachment_mime TEXT,
+      attachment_size INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS board_comments (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (post_id) REFERENCES board_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS board_post_likes (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (post_id, user_id),
+      FOREIGN KEY (post_id) REFERENCES board_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_todo_items_user_id_created_at ON todo_items(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_todo_checks_date_key ON todo_checks(date_key);
+    CREATE INDEX IF NOT EXISTS idx_board_posts_subject_created_at ON board_posts(subject_slug, is_notice DESC, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_board_comments_post_created_at ON board_comments(post_id, created_at ASC);
+    CREATE INDEX IF NOT EXISTS idx_board_post_likes_post_id ON board_post_likes(post_id);
   `);
 
   const todoItemColumns = db
@@ -121,6 +205,26 @@ function createDatabase() {
 
   if (!todoItemColumns.some((column) => column.name === "completed_at")) {
     db.exec("ALTER TABLE todo_items ADD COLUMN completed_at TEXT");
+  }
+
+  const boardPostColumns = db
+    .prepare("PRAGMA table_info(board_posts)")
+    .all() as { name: string }[];
+
+  if (!boardPostColumns.some((column) => column.name === "is_notice")) {
+    db.exec("ALTER TABLE board_posts ADD COLUMN is_notice INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!boardPostColumns.some((column) => column.name === "attachment_name")) {
+    db.exec("ALTER TABLE board_posts ADD COLUMN attachment_name TEXT");
+  }
+  if (!boardPostColumns.some((column) => column.name === "attachment_path")) {
+    db.exec("ALTER TABLE board_posts ADD COLUMN attachment_path TEXT");
+  }
+  if (!boardPostColumns.some((column) => column.name === "attachment_mime")) {
+    db.exec("ALTER TABLE board_posts ADD COLUMN attachment_mime TEXT");
+  }
+  if (!boardPostColumns.some((column) => column.name === "attachment_size")) {
+    db.exec("ALTER TABLE board_posts ADD COLUMN attachment_size INTEGER");
   }
 
   return db;
@@ -382,7 +486,11 @@ export function toggleTodoVisibilityForUser(userId: string, todoId: string) {
   ).run(todo.is_public ? 0 : 1, new Date().toISOString(), todo.id);
 }
 
-export function toggleTodoCheckForUser(userId: string, todoId: string, dateKey: string) {
+export function toggleTodoCheckForUser(
+  userId: string,
+  todoId: string,
+  dateKey: string,
+) {
   const db = getDatabase();
   const todo = db
     .prepare(
@@ -419,6 +527,238 @@ export function toggleTodoCheckForUser(userId: string, todoId: string, dateKey: 
       VALUES (?, ?, ?, ?)
     `,
   ).run(randomUUID(), todoId, dateKey, new Date().toISOString());
+}
+
+export function createBoardPost(input: {
+  userId: string;
+  subjectSlug: string;
+  title: string;
+  content: string;
+  isNotice: boolean;
+  attachment?: {
+    fileName: string;
+    filePath: string;
+    fileSize: number;
+    mimeType: string;
+  } | null;
+}) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `
+      INSERT INTO board_posts (
+        id,
+        subject_slug,
+        user_id,
+        title,
+        content,
+        is_notice,
+        attachment_name,
+        attachment_path,
+        attachment_mime,
+        attachment_size,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+  ).run(
+    randomUUID(),
+    input.subjectSlug,
+    input.userId,
+    input.title,
+    input.content,
+    input.isNotice ? 1 : 0,
+    input.attachment?.fileName ?? null,
+    input.attachment?.filePath ?? null,
+    input.attachment?.mimeType ?? null,
+    input.attachment?.fileSize ?? null,
+    now,
+    now,
+  );
+}
+
+function getBoardPostPermissionRecord(postId: string) {
+  const db = getDatabase();
+
+  return db
+    .prepare(
+      `
+        SELECT id, user_id, subject_slug, is_notice, attachment_path
+        FROM board_posts
+        WHERE id = ?
+      `,
+    )
+    .get(postId) as BoardPostPermissionRecord | undefined;
+}
+
+export function updateBoardPost(input: {
+  actorUserId: string;
+  postId: string;
+  title: string;
+  content: string;
+  isAdmin: boolean;
+  isNotice: boolean;
+  removeAttachment: boolean;
+  attachment?: {
+    fileName: string;
+    filePath: string;
+    fileSize: number;
+    mimeType: string;
+  } | null;
+}) {
+  const db = getDatabase();
+  const post = getBoardPostPermissionRecord(input.postId);
+
+  if (!post) {
+    return null;
+  }
+
+  if (!input.isAdmin && post.userId !== input.actorUserId) {
+    return null;
+  }
+
+  const nextAttachmentName =
+    input.attachment?.fileName ??
+    (input.removeAttachment ? null : getBoardAttachmentById(post.id)?.fileName ?? null);
+  const nextAttachmentPath =
+    input.attachment?.filePath ??
+    (input.removeAttachment ? null : post.attachmentPath);
+  const currentAttachment = getBoardAttachmentById(post.id);
+  const nextAttachmentMime =
+    input.attachment?.mimeType ??
+    (input.removeAttachment ? null : currentAttachment?.mimeType ?? null);
+  const nextAttachmentSize =
+    input.attachment?.fileSize ??
+    (input.removeAttachment ? null : currentAttachment?.fileSize ?? null);
+
+  db.prepare(
+    `
+      UPDATE board_posts
+      SET
+        title = ?,
+        content = ?,
+        is_notice = ?,
+        attachment_name = ?,
+        attachment_path = ?,
+        attachment_mime = ?,
+        attachment_size = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+  ).run(
+    input.title,
+    input.content,
+    input.isAdmin && input.isNotice ? 1 : 0,
+    nextAttachmentName,
+    nextAttachmentPath,
+    nextAttachmentMime,
+    nextAttachmentSize,
+    new Date().toISOString(),
+    post.id,
+  );
+
+  return {
+    previousAttachmentPath: post.attachmentPath,
+    subjectSlug: post.subjectSlug,
+    shouldDeletePreviousAttachment:
+      Boolean(post.attachmentPath) &&
+      (Boolean(input.attachment) || input.removeAttachment),
+  };
+}
+
+export function deleteBoardPost(input: {
+  actorUserId: string;
+  isAdmin: boolean;
+  postId: string;
+}) {
+  const db = getDatabase();
+  const post = getBoardPostPermissionRecord(input.postId);
+
+  if (!post) {
+    return null;
+  }
+
+  if (!input.isAdmin && post.userId !== input.actorUserId) {
+    return null;
+  }
+
+  db.prepare("DELETE FROM board_posts WHERE id = ?").run(post.id);
+
+  return {
+    attachmentPath: post.attachmentPath,
+    subjectSlug: post.subjectSlug,
+  };
+}
+
+export function createBoardComment(input: {
+  userId: string;
+  postId: string;
+  content: string;
+}) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const post = db
+    .prepare(
+      `
+        SELECT id
+        FROM board_posts
+        WHERE id = ?
+      `,
+    )
+    .get(input.postId) as { id: string } | undefined;
+
+  if (!post) {
+    return;
+  }
+
+  db.prepare(
+    `
+      INSERT INTO board_comments (id, post_id, user_id, content, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+  ).run(randomUUID(), input.postId, input.userId, input.content, now, now);
+}
+
+export function toggleBoardPostLike(userId: string, postId: string) {
+  const db = getDatabase();
+  const post = db
+    .prepare(
+      `
+        SELECT id
+        FROM board_posts
+        WHERE id = ?
+      `,
+    )
+    .get(postId) as { id: string } | undefined;
+
+  if (!post) {
+    return;
+  }
+
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM board_post_likes
+        WHERE post_id = ? AND user_id = ?
+      `,
+    )
+    .get(postId, userId) as { id: string } | undefined;
+
+  if (existing) {
+    db.prepare("DELETE FROM board_post_likes WHERE id = ?").run(existing.id);
+    return;
+  }
+
+  db.prepare(
+    `
+      INSERT INTO board_post_likes (id, post_id, user_id, created_at)
+      VALUES (?, ?, ?, ?)
+    `,
+  ).run(randomUUID(), postId, userId, new Date().toISOString());
 }
 
 function listChecksByTodo(weekKeys: string[]) {
@@ -487,7 +827,10 @@ function mapTodoRow(
   };
 }
 
-export function listTodosForUser(userId: string, weekKeys: string[]): TodoWithChecksRecord[] {
+export function listTodosForUser(
+  userId: string,
+  weekKeys: string[],
+): TodoWithChecksRecord[] {
   const db = getDatabase();
   const todos = db
     .prepare(
@@ -581,4 +924,173 @@ export function listUserStarTotals() {
   }
 
   return userStarTotals;
+}
+
+export function listBoardPostsBySubject(
+  subjectSlug: string,
+  currentUserId?: string | null,
+): BoardPostRecord[] {
+  const db = getDatabase();
+  const posts = db
+    .prepare(
+      `
+        SELECT
+          board_posts.id,
+          board_posts.subject_slug,
+          board_posts.title,
+          board_posts.content,
+          board_posts.is_notice,
+          board_posts.attachment_name,
+          board_posts.attachment_mime,
+          board_posts.attachment_size,
+          board_posts.created_at,
+          board_posts.updated_at,
+          users.id AS user_id,
+          users.nickname
+        FROM board_posts
+        INNER JOIN users ON users.id = board_posts.user_id
+        WHERE board_posts.subject_slug = ?
+        ORDER BY board_posts.is_notice DESC, board_posts.created_at DESC
+      `,
+    )
+    .all(subjectSlug) as {
+    id: string;
+    subject_slug: string;
+    title: string;
+    content: string;
+    is_notice: number;
+    attachment_name: string | null;
+    attachment_mime: string | null;
+    attachment_size: number | null;
+    created_at: string;
+    updated_at: string;
+    user_id: string;
+    nickname: string;
+  }[];
+
+  if (posts.length === 0) {
+    return [];
+  }
+
+  const postIds = posts.map((post) => post.id);
+  const comments = db
+    .prepare(
+      `
+        SELECT
+          board_comments.id,
+          board_comments.post_id,
+          board_comments.content,
+          board_comments.created_at,
+          users.id AS user_id,
+          users.nickname
+        FROM board_comments
+        INNER JOIN users ON users.id = board_comments.user_id
+        WHERE board_comments.post_id IN (${postIds.map(() => "?").join(", ")})
+        ORDER BY board_comments.created_at ASC
+      `,
+    )
+    .all(...postIds) as {
+    id: string;
+    post_id: string;
+    content: string;
+    created_at: string;
+    user_id: string;
+    nickname: string;
+  }[];
+
+  const likes = db
+    .prepare(
+      `
+        SELECT post_id, user_id
+        FROM board_post_likes
+        WHERE post_id IN (${postIds.map(() => "?").join(", ")})
+      `,
+    )
+    .all(...postIds) as {
+    post_id: string;
+    user_id: string;
+  }[];
+
+  const commentsByPostId = new Map<string, BoardCommentRecord[]>();
+  for (const comment of comments) {
+    const group = commentsByPostId.get(comment.post_id) ?? [];
+    group.push({
+      id: comment.id,
+      content: comment.content,
+      createdAt: comment.created_at,
+      postId: comment.post_id,
+      user: {
+        id: comment.user_id,
+        nickname: comment.nickname,
+      },
+    });
+    commentsByPostId.set(comment.post_id, group);
+  }
+
+  const likeCounts = new Map<string, number>();
+  const likedPostIds = new Set<string>();
+  for (const like of likes) {
+    likeCounts.set(like.post_id, (likeCounts.get(like.post_id) ?? 0) + 1);
+    if (currentUserId && like.user_id === currentUserId) {
+      likedPostIds.add(like.post_id);
+    }
+  }
+
+  return posts.map((post) => ({
+    id: post.id,
+    attachment: post.attachment_name
+      ? {
+          fileName: post.attachment_name,
+          fileSize: post.attachment_size ?? 0,
+          mimeType: post.attachment_mime ?? "application/octet-stream",
+          postId: post.id,
+        }
+      : null,
+    comments: commentsByPostId.get(post.id) ?? [],
+    content: post.content,
+    createdAt: post.created_at,
+    isLikedByCurrentUser: likedPostIds.has(post.id),
+    isNotice: Boolean(post.is_notice),
+    likeCount: likeCounts.get(post.id) ?? 0,
+    subjectSlug: post.subject_slug,
+    title: post.title,
+    updatedAt: post.updated_at,
+    user: {
+      id: post.user_id,
+      nickname: post.nickname,
+    },
+  }));
+}
+
+export function getBoardAttachmentById(postId: string) {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `
+        SELECT id, attachment_name, attachment_path, attachment_mime, attachment_size
+        FROM board_posts
+        WHERE id = ? AND attachment_path IS NOT NULL
+      `,
+    )
+    .get(postId) as
+    | {
+        id: string;
+        attachment_name: string;
+        attachment_path: string;
+        attachment_mime: string | null;
+        attachment_size: number | null;
+      }
+    | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    fileName: row.attachment_name,
+    filePath: row.attachment_path,
+    fileSize: row.attachment_size ?? 0,
+    mimeType: row.attachment_mime ?? "application/octet-stream",
+    postId: row.id,
+  };
 }

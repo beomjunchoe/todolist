@@ -5,7 +5,9 @@ import {
   buildCookieOptions,
   createSessionRecord,
   isKakaoConfigured,
+  KAKAO_RETURN_TO_COOKIE_NAME,
   KAKAO_STATE_COOKIE_NAME,
+  normalizeReturnToPath,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
 import { upsertUserByKakao } from "@/lib/db";
@@ -27,7 +29,12 @@ type KakaoUserResponse = {
 function redirectWithAuthError(request: Request, code: string) {
   const url = new URL("/", request.url);
   url.searchParams.set("auth", code);
-  return NextResponse.redirect(url);
+
+  const response = NextResponse.redirect(url);
+  response.cookies.delete(KAKAO_STATE_COOKIE_NAME);
+  response.cookies.delete(KAKAO_RETURN_TO_COOKIE_NAME);
+
+  return response;
 }
 
 export async function GET(request: Request) {
@@ -35,6 +42,9 @@ export async function GET(request: Request) {
   const cookieStore = await cookies();
   const state = searchParams.get("state");
   const savedState = cookieStore.get(KAKAO_STATE_COOKIE_NAME)?.value;
+  const returnTo = normalizeReturnToPath(
+    cookieStore.get(KAKAO_RETURN_TO_COOKIE_NAME)?.value,
+  );
   const code = searchParams.get("code");
   const error = searchParams.get("error");
 
@@ -88,7 +98,8 @@ export async function GET(request: Request) {
   }
 
   const profile = (await profileResponse.json()) as KakaoUserResponse;
-  const nickname = profile.kakao_account?.profile?.nickname?.trim() || "카카오 사용자";
+  const nickname =
+    profile.kakao_account?.profile?.nickname?.trim() || "카카오 사용자";
   const profileImage = profile.kakao_account?.profile?.profile_image_url ?? null;
 
   const user = upsertUserByKakao({
@@ -98,10 +109,11 @@ export async function GET(request: Request) {
   });
 
   const { expiresAt, token } = await createSessionRecord(user.id);
-  const response = NextResponse.redirect(new URL("/", request.url));
+  const response = NextResponse.redirect(new URL(returnTo, request.url));
 
   response.cookies.set(SESSION_COOKIE_NAME, token, buildCookieOptions(expiresAt));
   response.cookies.delete(KAKAO_STATE_COOKIE_NAME);
+  response.cookies.delete(KAKAO_RETURN_TO_COOKIE_NAME);
 
   return response;
 }

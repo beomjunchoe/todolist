@@ -3,15 +3,29 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getCurrentUser, isAdminUser, signOutCurrentSession } from "@/lib/auth";
+import {
+  getCurrentUser,
+  isAdminUser,
+  signOutCurrentSession,
+} from "@/lib/auth";
 import {
   completeTodoItemForUser,
+  createBoardComment as createBoardCommentRecord,
+  createBoardPost as createBoardPostRecord,
   createTodoItem,
+  deleteBoardPost,
   deleteTodoItemById,
   deleteTodoItemForUser,
+  toggleBoardPostLike,
   toggleTodoCheckForUser,
+  updateBoardPost,
   updateTodoItemForUser,
 } from "@/lib/db";
+import {
+  deleteBoardAttachment,
+  saveBoardAttachment,
+} from "@/lib/board-files";
+import { getSubjectBySlug } from "@/lib/subjects";
 
 async function requireSignedInUser() {
   const user = await getCurrentUser();
@@ -33,6 +47,18 @@ async function requireAdminUser() {
   return user;
 }
 
+function revalidateTodoPages() {
+  revalidatePath("/todo");
+}
+
+function revalidateBoardPages(subjectSlug?: string) {
+  revalidatePath("/boards");
+
+  if (subjectSlug) {
+    revalidatePath(`/boards/${subjectSlug}`);
+  }
+}
+
 export async function createTodo(formData: FormData) {
   const user = await requireSignedInUser();
   const title = `${formData.get("title") ?? ""}`.trim();
@@ -48,7 +74,7 @@ export async function createTodo(formData: FormData) {
     userId: user.id,
   });
 
-  revalidatePath("/");
+  revalidateTodoPages();
 }
 
 export async function updateTodo(formData: FormData) {
@@ -68,7 +94,7 @@ export async function updateTodo(formData: FormData) {
     userId: user.id,
   });
 
-  revalidatePath("/");
+  revalidateTodoPages();
 }
 
 export async function deleteTodo(formData: FormData) {
@@ -80,7 +106,7 @@ export async function deleteTodo(formData: FormData) {
   }
 
   deleteTodoItemForUser(user.id, todoId);
-  revalidatePath("/");
+  revalidateTodoPages();
 }
 
 export async function completeTodo(formData: FormData) {
@@ -92,7 +118,7 @@ export async function completeTodo(formData: FormData) {
   }
 
   completeTodoItemForUser(user.id, todoId);
-  revalidatePath("/");
+  revalidateTodoPages();
 }
 
 export async function deleteTodoAsAdmin(formData: FormData) {
@@ -104,7 +130,7 @@ export async function deleteTodoAsAdmin(formData: FormData) {
   }
 
   deleteTodoItemById(todoId);
-  revalidatePath("/");
+  revalidateTodoPages();
 }
 
 export async function toggleTodoCheck(formData: FormData) {
@@ -117,7 +143,132 @@ export async function toggleTodoCheck(formData: FormData) {
   }
 
   toggleTodoCheckForUser(user.id, todoId, dateKey);
-  revalidatePath("/");
+  revalidateTodoPages();
+}
+
+export async function createBoardPost(formData: FormData) {
+  const user = await requireSignedInUser();
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+  const title = `${formData.get("title") ?? ""}`.trim();
+  const content = `${formData.get("content") ?? ""}`.trim();
+  const isNotice = formData.get("isNotice") === "on" && isAdminUser(user);
+  const attachmentValue = formData.get("attachment");
+
+  if (!getSubjectBySlug(subjectSlug) || !title || !content) {
+    return;
+  }
+
+  const attachment =
+    attachmentValue instanceof File && attachmentValue.size > 0
+      ? await saveBoardAttachment(attachmentValue)
+      : null;
+
+  createBoardPostRecord({
+    attachment,
+    content: content.slice(0, 4000),
+    isNotice,
+    subjectSlug,
+    title: title.slice(0, 100),
+    userId: user.id,
+  });
+
+  revalidateBoardPages(subjectSlug);
+}
+
+export async function updateBoardPostAction(formData: FormData) {
+  const user = await requireSignedInUser();
+  const postId = `${formData.get("postId") ?? ""}`.trim();
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+  const title = `${formData.get("title") ?? ""}`.trim();
+  const content = `${formData.get("content") ?? ""}`.trim();
+  const removeAttachment = formData.get("removeAttachment") === "on";
+  const isNotice = formData.get("isNotice") === "on";
+  const attachmentValue = formData.get("attachment");
+
+  if (!postId || !getSubjectBySlug(subjectSlug) || !title || !content) {
+    return;
+  }
+
+  const nextAttachment =
+    attachmentValue instanceof File && attachmentValue.size > 0
+      ? await saveBoardAttachment(attachmentValue)
+      : null;
+
+  const result = updateBoardPost({
+    actorUserId: user.id,
+    attachment: nextAttachment,
+    content: content.slice(0, 4000),
+    isAdmin: isAdminUser(user),
+    isNotice,
+    postId,
+    removeAttachment,
+    title: title.slice(0, 100),
+  });
+
+  if (!result && nextAttachment) {
+    await deleteBoardAttachment(nextAttachment.filePath);
+    return;
+  }
+
+  if (result?.shouldDeletePreviousAttachment) {
+    await deleteBoardAttachment(result.previousAttachmentPath);
+  }
+
+  revalidateBoardPages(subjectSlug);
+}
+
+export async function deleteBoardPostAction(formData: FormData) {
+  const user = await requireSignedInUser();
+  const postId = `${formData.get("postId") ?? ""}`.trim();
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+
+  if (!postId || !getSubjectBySlug(subjectSlug)) {
+    return;
+  }
+
+  const result = deleteBoardPost({
+    actorUserId: user.id,
+    isAdmin: isAdminUser(user),
+    postId,
+  });
+
+  if (result?.attachmentPath) {
+    await deleteBoardAttachment(result.attachmentPath);
+  }
+
+  revalidateBoardPages(subjectSlug);
+}
+
+export async function toggleBoardLikeAction(formData: FormData) {
+  const user = await requireSignedInUser();
+  const postId = `${formData.get("postId") ?? ""}`.trim();
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+
+  if (!postId || !getSubjectBySlug(subjectSlug)) {
+    return;
+  }
+
+  toggleBoardPostLike(user.id, postId);
+  revalidateBoardPages(subjectSlug);
+}
+
+export async function createBoardComment(formData: FormData) {
+  const user = await requireSignedInUser();
+  const postId = `${formData.get("postId") ?? ""}`.trim();
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+  const content = `${formData.get("content") ?? ""}`.trim();
+
+  if (!postId || !getSubjectBySlug(subjectSlug) || !content) {
+    return;
+  }
+
+  createBoardCommentRecord({
+    content: content.slice(0, 2000),
+    postId,
+    userId: user.id,
+  });
+
+  revalidateBoardPages(subjectSlug);
 }
 
 export async function signOut() {

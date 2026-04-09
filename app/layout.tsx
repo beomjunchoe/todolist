@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Noto_Sans_KR, Space_Grotesk } from "next/font/google";
+
 import "./globals.css";
 
 const bodyFont = Noto_Sans_KR({
@@ -21,8 +22,9 @@ const monoFont = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "함께 쓰는 투두",
-  description: "카카오 로그인으로 사용하는 공유형 주간 투두리스트",
+  title: "학산여중 3-1",
+  description:
+    "카카오 로그인으로 사용하는 학산여중 3-1 전용 공유형 투두리스트와 과목별 게시판입니다.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -41,7 +43,7 @@ export default function RootLayout({
       lang="ko"
       className={`${bodyFont.variable} ${displayFont.variable} ${monoFont.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }
