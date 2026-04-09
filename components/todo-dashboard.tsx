@@ -6,6 +6,7 @@ import { formatWeekRange, getCurrentWeek } from "@/lib/week";
 import { AdminBadge } from "./badges";
 import { BoardTable } from "./board-table";
 import { InstallShortcut } from "./install-shortcut";
+import { MobileTabBar } from "./mobile-tab-bar";
 import { Scoreboard } from "./scoreboard";
 import { Sidebar } from "./sidebar";
 import { SiteNav } from "./site-nav";
@@ -55,7 +56,7 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
   const authMessage = getAuthMessage(searchParams?.auth, kakaoConfigured);
 
   return (
-    <main className="min-h-screen px-3 py-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen px-3 py-4 pb-28 sm:px-6 sm:pb-6 lg:px-8">
       <div className="mx-auto max-w-[1480px] space-y-4 sm:space-y-5">
         <SiteNav
           currentPath="/todo"
@@ -63,8 +64,8 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
           userName={currentUser?.nickname ?? null}
         />
 
-        <section className="glass-panel rounded-[28px] px-4 py-3 sm:rounded-[32px] sm:px-6 sm:py-5">
-          <div className="flex items-start justify-between gap-4 lg:items-end">
+        <section className="glass-panel rounded-[26px] px-4 py-4 sm:rounded-[32px] sm:px-6 sm:py-5">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.22em] text-[var(--muted)]">
                 학산여중 3-1 전용
@@ -72,51 +73,35 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
               <h1 className="display-font mt-1 text-xl font-bold leading-tight sm:mt-2 sm:text-[28px] lg:text-4xl">
                 공유형 투두리스트
               </h1>
-              <p className="mt-3 hidden max-w-3xl text-[13px] leading-6 text-[var(--muted)] sm:block sm:text-sm sm:leading-7">
-                목록은 기본 공개입니다. 각 할 일은 내용 공개 또는 비공개를
-                고를 수 있고, 오른쪽 메인 표에서 자신의 행만 직접 체크할 수
-                있습니다.
-              </p>
-              <p className="mt-3 hidden max-w-3xl text-[12px] leading-6 text-[var(--muted)] sm:block sm:text-sm">
-                어떤 사소한 목표든, 꾸준히 하는 게 중요합니다. 어제보다 한 걸음
-                더 나아간 여러분이 되길 바랍니다 - 범준T
+              <p className="mt-2 text-[12px] leading-6 text-[var(--muted)] sm:text-sm sm:leading-7">
+                목록은 기본 공개입니다. 오른쪽 메인 표에서 자기 행만 직접
+                체크할 수 있습니다.
               </p>
             </div>
 
-            <div className="flex shrink-0 flex-col items-end gap-2 lg:items-start lg:rounded-[24px] lg:border lg:border-[var(--line)] lg:bg-white/70 lg:px-4 lg:py-3">
-              <div className="text-right lg:text-left">
-                <div className="text-[10px] font-semibold tracking-[0.18em] text-[var(--muted)] lg:text-[11px]">
+            <div className="grid gap-2 sm:grid-cols-[auto_auto] lg:flex lg:flex-col lg:items-start">
+              <div className="rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-center lg:text-left">
+                <div className="text-[10px] font-semibold tracking-[0.18em] text-[var(--muted)]">
                   이번 주
                 </div>
-                <div className="mt-0.5 text-xs font-semibold lg:mt-1 lg:text-sm">
+                <div className="mt-1 text-sm font-semibold">
                   {formatWeekRange(week)}
                 </div>
               </div>
 
               {currentUser ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                <div className="flex items-center justify-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[11px] text-[var(--muted)] lg:justify-start">
                   <span>{currentUser.nickname} 님</span>
                   {currentUserIsAdmin ? <AdminBadge /> : null}
                 </div>
               ) : (
                 <a
-                  className="rounded-full bg-[#FEE500] px-3 py-1.5 text-[11px] font-semibold text-[#191600] lg:px-4 lg:py-2 lg:text-xs"
+                  className="flex items-center justify-center rounded-2xl bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#191600]"
                   href="/api/auth/kakao/start?returnTo=/todo"
                 >
                   카카오로 로그인
                 </a>
               )}
-
-              <div className="hidden sm:block">
-                <InstallShortcut />
-              </div>
-
-              {currentUserIsAdmin ? (
-                <p className="hidden text-[11px] leading-5 text-[var(--muted)] lg:block">
-                  관리자 모드: 다른 사람 할 일을 메인 보드에서 삭제할 수
-                  있습니다.
-                </p>
-              ) : null}
             </div>
           </div>
 
@@ -126,9 +111,16 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
             </div>
           ) : null}
 
-          <div className="mt-3 sm:hidden">
+          <div className="mt-3">
             <InstallShortcut />
           </div>
+
+          {currentUserIsAdmin ? (
+            <p className="mt-3 text-[11px] leading-5 text-[var(--muted)]">
+              관리자 모드에서는 다른 사람 할 일도 메인 보드에서 삭제할 수
+              있습니다.
+            </p>
+          ) : null}
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -141,11 +133,11 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
                 myTodos={myTodos}
               />
             ) : (
-              <aside className="glass-panel rounded-[28px] p-5 lg:sticky lg:top-6 lg:self-start">
+              <aside className="glass-panel rounded-[24px] p-4 sm:rounded-[28px] sm:p-5 lg:sticky lg:top-6 lg:self-start">
                 <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
                   시작하기
                 </p>
-                <h2 className="display-font mt-2 text-xl font-bold">
+                <h2 className="display-font mt-2 text-lg font-bold sm:text-xl">
                   로그인하면 바로 추가
                 </h2>
                 <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
@@ -153,7 +145,7 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
                   체크는 오른쪽 메인 표에서 자기 행만 가능합니다.
                 </p>
                 <a
-                  className="mt-4 inline-flex rounded-full bg-[#FEE500] px-4 py-3 text-xs font-semibold text-[#191600]"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#191600]"
                   href="/api/auth/kakao/start?returnTo=/todo"
                 >
                   카카오로 로그인
@@ -178,6 +170,7 @@ export async function TodoDashboard({ searchParams }: TodoDashboardProps) {
           </div>
         </div>
       </div>
+      <MobileTabBar currentPath="/todo" />
     </main>
   );
 }

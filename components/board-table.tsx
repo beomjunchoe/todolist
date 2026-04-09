@@ -1,7 +1,5 @@
 import { deleteTodoAsAdmin } from "@/app/actions";
-import {
-  groupBoardTodos,
-} from "@/lib/todo-helpers";
+import { groupBoardTodos } from "@/lib/todo-helpers";
 import { formatWeekColumnLabel, type WeekDay } from "@/lib/week";
 
 import { StarBadge } from "./badges";
@@ -36,10 +34,13 @@ export function BoardTable({
 }) {
   if (groups.length === 0) {
     return (
-      <div className="glass-panel rounded-[30px] p-8">
-        <h2 className="display-font text-2xl font-bold">사용자별 주간 체크 표</h2>
+      <div className="glass-panel rounded-[30px] p-6 sm:p-8">
+        <h2 className="display-font text-xl font-bold sm:text-2xl">
+          사용자별 주간 체크 표
+        </h2>
         <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-          아직 등록된 할 일이 없습니다. 로그인한 뒤 왼쪽에서 첫 할 일을 만들어 보세요.
+          아직 등록된 할 일이 없습니다. 로그인한 뒤 왼쪽 관리 바에서 첫 할 일을
+          만들어 보세요.
         </p>
       </div>
     );
@@ -47,14 +48,16 @@ export function BoardTable({
 
   return (
     <div className="glass-panel overflow-hidden rounded-[30px]">
-      <div className="border-b border-[var(--line)] bg-white/60 px-5 py-4">
+      <div className="border-b border-[var(--line)] bg-white/60 px-4 py-4 sm:px-5">
         <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
           메인 보드
         </p>
-        <h2 className="display-font mt-1 text-2xl font-bold">사용자별 주간 체크 표</h2>
+        <h2 className="display-font mt-1 text-xl font-bold sm:text-2xl">
+          사용자별 주간 체크 표
+        </h2>
       </div>
 
-      <div className="lg:hidden space-y-3 p-4">
+      <div className="space-y-3 p-3 sm:p-4 lg:hidden">
         {groups.map((group) => {
           const isMine = group.userId === currentUserId;
           const completedCount = userStarTotals.get(group.userId) ?? 0;
@@ -62,25 +65,25 @@ export function BoardTable({
           return (
             <section
               key={group.userId}
-              className="rounded-[26px] border border-[var(--line)] bg-white/82 p-4"
+              className="rounded-[26px] border border-[var(--line)] bg-white/82 p-3.5"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent)]">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent)]">
                     {group.nickname.slice(0, 1)}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold">{group.nickname}</p>
                       {completedCount > 0 ? <StarBadge count={completedCount} /> : null}
                       {isMine ? (
                         <span className="rounded-full bg-[var(--foreground)] px-2 py-1 text-[10px] font-semibold text-white">
-                          나
+                          내 체크
                         </span>
                       ) : null}
                     </div>
                     <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
-                      {isMine ? "아래 카드에서 내 체크를 바로 누를 수 있습니다." : "읽기 전용"}
+                      {isMine ? "아래 카드에서 바로 체크할 수 있습니다." : "읽기 전용"}
                     </p>
                   </div>
                 </div>
@@ -93,11 +96,11 @@ export function BoardTable({
                   return (
                     <article
                       key={todo.id}
-                      className="rounded-3xl border border-[var(--line)] bg-[rgba(255,255,255,0.86)] p-3"
+                      className="rounded-3xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] p-3"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
                             {todo.isContentPublic ? todo.title : "비공개 할 일"}
                           </p>
                         </div>
@@ -109,35 +112,37 @@ export function BoardTable({
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-7 gap-1.5">
-                        {week.map((day) => (
-                          <div
-                            key={`${todo.id}-${day.dateKey}`}
-                            className="rounded-2xl border border-[var(--line)] bg-white/90 px-1 py-2"
-                          >
+                      <div className="-mx-1 mt-3 overflow-x-auto px-1">
+                        <div className="grid min-w-[308px] grid-cols-7 gap-1.5">
+                          {week.map((day) => (
                             <div
-                              className={`mb-1 whitespace-nowrap text-center text-[8px] font-semibold leading-4 ${
-                                day.weekdayNumber === 0
-                                  ? "text-[var(--accent)]"
-                                  : day.weekdayNumber === 6
-                                    ? "text-[var(--sky)]"
-                                    : day.isToday
-                                      ? "text-[var(--accent)]"
-                                      : "text-[var(--muted)]"
-                              }`}
+                              key={`${todo.id}-${day.dateKey}`}
+                              className="rounded-2xl border border-[var(--line)] bg-white/92 px-1 py-2"
                             >
-                              {day.dayNumber}/{day.shortLabel}
+                              <div
+                                className={`mb-1 whitespace-nowrap text-center text-[8px] font-semibold leading-4 ${
+                                  day.weekdayNumber === 0
+                                    ? "text-[var(--accent)]"
+                                    : day.weekdayNumber === 6
+                                      ? "text-[var(--sky)]"
+                                      : day.isToday
+                                        ? "text-[var(--accent)]"
+                                        : "text-[var(--muted)]"
+                                }`}
+                              >
+                                {day.dayNumber}/{day.shortLabel}
+                              </div>
+                              <div className="flex justify-center">
+                                <CheckCell
+                                  checked={checkDates.has(day.dateKey)}
+                                  dateKey={day.dateKey}
+                                  editable={isMine}
+                                  todoId={todo.id}
+                                />
+                              </div>
                             </div>
-                            <div className="flex justify-center">
-                              <CheckCell
-                                checked={checkDates.has(day.dateKey)}
-                                dateKey={day.dateKey}
-                                editable={isMine}
-                                todoId={todo.id}
-                              />
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     </article>
                   );

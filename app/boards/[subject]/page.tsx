@@ -11,6 +11,8 @@ import {
   updateBoardPostAction,
 } from "@/app/actions";
 import { AdminBadge } from "@/components/badges";
+import { FloatingWriteButton } from "@/components/floating-write-button";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { SiteNav } from "@/components/site-nav";
 import { getCurrentUser, isAdminUser } from "@/lib/auth";
 import { listBoardPostsBySubject } from "@/lib/db";
@@ -42,6 +44,65 @@ function getSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function BoardPostForm({
+  isAdmin,
+  subjectSlug,
+}: {
+  isAdmin: boolean;
+  subjectSlug: string;
+}) {
+  return (
+    <form
+      action={createBoardPost}
+      className="space-y-3"
+      encType="multipart/form-data"
+    >
+      <input name="subjectSlug" type="hidden" value={subjectSlug} />
+      <input
+        className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
+        maxLength={100}
+        name="title"
+        placeholder="제목"
+        required
+        type="text"
+      />
+      <textarea
+        className="min-h-[140px] w-full rounded-3xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
+        maxLength={4000}
+        name="content"
+        placeholder="정리한 내용이나 공부 팁을 자유롭게 올려 주세요."
+        required
+      />
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <label className="rounded-2xl border border-dashed border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--muted)]">
+          <div className="font-semibold text-[var(--foreground)]">자료 첨부</div>
+          <div className="mt-1 text-xs leading-5">
+            PDF, 이미지, 한글 파일 등 8MB 이하
+          </div>
+          <input className="mt-3 block w-full text-xs" name="attachment" type="file" />
+        </label>
+
+        {isAdmin ? (
+          <label className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-4 py-3 text-xs font-semibold">
+            <input
+              className="h-4 w-4 accent-[var(--accent)]"
+              name="isNotice"
+              type="checkbox"
+            />
+            공지글로 올리기
+          </label>
+        ) : null}
+      </div>
+      <button
+        className="w-full rounded-full bg-[var(--foreground)] px-4 py-3 text-sm font-semibold text-white sm:w-auto"
+        type="submit"
+      >
+        게시글 올리기
+      </button>
+    </form>
+  );
+}
+
 export default async function SubjectBoardPage({
   params,
   searchParams,
@@ -64,7 +125,7 @@ export default async function SubjectBoardPage({
   });
 
   return (
-    <main className="min-h-screen px-3 py-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen px-3 py-4 pb-28 sm:px-6 sm:pb-6 lg:px-8">
       <div className="mx-auto max-w-[1280px] space-y-4 sm:space-y-5">
         <SiteNav
           currentPath="/boards"
@@ -72,7 +133,7 @@ export default async function SubjectBoardPage({
           userName={currentUser?.nickname ?? null}
         />
 
-        <section className="glass-panel rounded-[32px] px-5 py-5 sm:px-6">
+        <section className="glass-panel rounded-[28px] px-4 py-5 sm:rounded-[32px] sm:px-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <Link
@@ -82,7 +143,9 @@ export default async function SubjectBoardPage({
                 과목별 게시판
               </Link>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <h1 className="display-font text-3xl font-bold">{subject.name}</h1>
+                <h1 className="display-font text-2xl font-bold sm:text-3xl">
+                  {subject.name}
+                </h1>
                 {currentUserIsAdmin ? <AdminBadge /> : null}
               </div>
               <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
@@ -92,7 +155,7 @@ export default async function SubjectBoardPage({
 
             {!currentUser ? (
               <a
-                className="rounded-full bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#191600]"
+                className="flex items-center justify-center rounded-full bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#191600]"
                 href={`/api/auth/kakao/start?returnTo=/boards/${subject.slug}`}
               >
                 카카오로 로그인
@@ -101,8 +164,8 @@ export default async function SubjectBoardPage({
           </div>
         </section>
 
-        <section className="glass-panel rounded-[28px] p-5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <section className="glass-panel rounded-[24px] p-4 sm:rounded-[28px] sm:p-5">
+          <div className="flex flex-col gap-3">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
                 게시판 보기
@@ -110,7 +173,7 @@ export default async function SubjectBoardPage({
               <h2 className="mt-1 text-lg font-semibold">검색과 필터</h2>
             </div>
 
-            <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <form className="grid gap-3">
               <input
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
                 defaultValue={search}
@@ -129,84 +192,53 @@ export default async function SubjectBoardPage({
                 공지글만 보기
               </label>
               <button
-                className="rounded-full bg-[var(--foreground)] px-4 py-3 text-xs font-semibold text-white"
+                className="rounded-full bg-[var(--foreground)] px-4 py-3 text-sm font-semibold text-white"
                 type="submit"
               >
-                적용
+                적용하기
               </button>
             </form>
           </div>
         </section>
 
         {currentUser ? (
-          <section className="glass-panel rounded-[28px] p-5">
-            <div>
-              <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
-                새 글 작성
-              </p>
-              <h2 className="mt-1 text-lg font-semibold">
-                {subject.name} 게시글 올리기
-              </h2>
-            </div>
-
-            <form
-              action={createBoardPost}
-              className="mt-4 space-y-3"
-              encType="multipart/form-data"
+          <>
+            <section
+              className="glass-panel rounded-[24px] p-4 lg:hidden"
+              id="write-post"
             >
-              <input name="subjectSlug" type="hidden" value={subject.slug} />
-              <input
-                className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
-                maxLength={100}
-                name="title"
-                placeholder="제목"
-                required
-                type="text"
-              />
-              <textarea
-                className="min-h-[140px] w-full rounded-3xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
-                maxLength={4000}
-                name="content"
-                placeholder="정리한 내용이나 공부 팁을 자유롭게 올려 주세요."
-                required
-              />
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                <label className="rounded-2xl border border-dashed border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--muted)]">
-                  <div className="font-semibold text-[var(--foreground)]">
-                    자료 첨부
-                  </div>
-                  <div className="mt-1 text-xs leading-5">
-                    PDF, 이미지, 한글 파일 등 8MB 이하
-                  </div>
-                  <input
-                    className="mt-3 block w-full text-xs"
-                    name="attachment"
-                    type="file"
-                  />
-                </label>
-
-                {currentUserIsAdmin ? (
-                  <label className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-4 py-3 text-xs font-semibold">
-                    <input
-                      className="h-4 w-4 accent-[var(--accent)]"
-                      name="isNotice"
-                      type="checkbox"
-                    />
-                    공지글로 올리기
-                  </label>
-                ) : null}
+              <div className="mb-4">
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                  새 글 작성
+                </p>
+                <h2 className="mt-1 text-lg font-semibold">게시글 쓰기</h2>
               </div>
-              <button
-                className="rounded-full bg-[var(--foreground)] px-4 py-3 text-sm font-semibold text-white"
-                type="submit"
-              >
-                게시글 올리기
-              </button>
-            </form>
-          </section>
+              <BoardPostForm
+                isAdmin={currentUserIsAdmin}
+                subjectSlug={subject.slug}
+              />
+            </section>
+
+            <section className="hidden glass-panel rounded-[28px] p-5 lg:block">
+              <div>
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+                  새 글 작성
+                </p>
+                <h2 className="mt-1 text-lg font-semibold">
+                  {subject.name} 게시글 올리기
+                </h2>
+              </div>
+              <div className="mt-4">
+                <BoardPostForm
+                  isAdmin={currentUserIsAdmin}
+                  subjectSlug={subject.slug}
+                />
+              </div>
+            </section>
+          </>
         ) : null}
 
-        <section className="space-y-4">
+        <section className="space-y-3 sm:space-y-4">
           {posts.length > 0 ? (
             posts.map((post) => {
               const canManagePost =
@@ -214,45 +246,49 @@ export default async function SubjectBoardPage({
                 (currentUserIsAdmin || currentUser?.id === post.user.id);
 
               return (
-                <article key={post.id} className="glass-panel rounded-[28px] p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {post.isNotice ? (
-                          <span className="rounded-full bg-[rgba(236,108,47,0.12)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent)]">
-                            공지
-                          </span>
-                        ) : null}
-                        <h2 className="text-lg font-semibold">{post.title}</h2>
-                      </div>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
-                        {post.content}
-                      </p>
-
-                      {post.attachment ? (
-                        <a
-                          className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-4 py-2 text-xs font-semibold"
-                          href={`/api/board-files/${post.id}`}
-                        >
-                          첨부 자료 다운로드
-                          <span className="font-normal text-[var(--muted)]">
-                            {post.attachment.fileName} ·{" "}
-                            {formatFileSize(post.attachment.fileSize)}
-                          </span>
-                        </a>
+                <article
+                  key={post.id}
+                  className="glass-panel rounded-[24px] p-4 sm:rounded-[28px] sm:p-5"
+                >
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {post.isNotice ? (
+                        <span className="rounded-full bg-[rgba(236,108,47,0.12)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent)]">
+                          공지
+                        </span>
                       ) : null}
+                      <h2 className="text-lg font-semibold">{post.title}</h2>
                     </div>
 
-                    <div className="shrink-0 text-[11px] leading-5 text-[var(--muted)]">
-                      <div>{post.user.nickname}</div>
-                      <div>{new Date(post.createdAt).toLocaleString("ko-KR")}</div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--muted)]">
+                      <span>{post.user.nickname}</span>
+                      <span>{new Date(post.createdAt).toLocaleString("ko-KR")}</span>
                       {post.updatedAt !== post.createdAt ? (
-                        <div>수정 {new Date(post.updatedAt).toLocaleString("ko-KR")}</div>
+                        <span>
+                          수정 {new Date(post.updatedAt).toLocaleString("ko-KR")}
+                        </span>
                       ) : null}
                     </div>
+
+                    <p className="whitespace-pre-wrap text-sm leading-7">
+                      {post.content}
+                    </p>
+
+                    {post.attachment ? (
+                      <a
+                        className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-4 py-2 text-xs font-semibold"
+                        href={`/api/board-files/${post.id}`}
+                      >
+                        첨부 자료
+                        <span className="font-normal text-[var(--muted)]">
+                          {post.attachment.fileName} ·{" "}
+                          {formatFileSize(post.attachment.fileSize)}
+                        </span>
+                      </a>
+                    ) : null}
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     {currentUser ? (
                       <form action={toggleBoardLikeAction}>
                         <input name="postId" type="hidden" value={post.id} />
@@ -280,7 +316,7 @@ export default async function SubjectBoardPage({
                     )}
 
                     {canManagePost ? (
-                      <details className="rounded-[20px] border border-[var(--line)] bg-white px-4 py-3 text-sm">
+                      <details className="rounded-[18px] border border-[var(--line)] bg-white px-3 py-2 text-xs">
                         <summary className="cursor-pointer list-none font-semibold">
                           게시글 수정
                         </summary>
@@ -310,41 +346,39 @@ export default async function SubjectBoardPage({
                             name="content"
                             required
                           />
-                          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                            <label className="rounded-2xl border border-dashed border-[var(--line)] px-4 py-3 text-xs text-[var(--muted)]">
-                              새 자료 첨부
-                              <input
-                                className="mt-2 block w-full"
-                                name="attachment"
-                                type="file"
-                              />
-                            </label>
-                            <div className="space-y-2">
-                              {currentUserIsAdmin ? (
-                                <label className="flex items-center gap-2 text-xs">
-                                  <input
-                                    className="h-4 w-4 accent-[var(--accent)]"
-                                    defaultChecked={post.isNotice}
-                                    name="isNotice"
-                                    type="checkbox"
-                                  />
-                                  공지글 유지
-                                </label>
-                              ) : null}
-                              {post.attachment ? (
-                                <label className="flex items-center gap-2 text-xs">
-                                  <input
-                                    className="h-4 w-4 accent-[var(--accent)]"
-                                    name="removeAttachment"
-                                    type="checkbox"
-                                  />
-                                  기존 첨부 삭제
-                                </label>
-                              ) : null}
-                            </div>
+                          <label className="block rounded-2xl border border-dashed border-[var(--line)] px-4 py-3 text-xs text-[var(--muted)]">
+                            새 자료 첨부
+                            <input
+                              className="mt-2 block w-full"
+                              name="attachment"
+                              type="file"
+                            />
+                          </label>
+                          <div className="space-y-2">
+                            {currentUserIsAdmin ? (
+                              <label className="flex items-center gap-2 text-xs">
+                                <input
+                                  className="h-4 w-4 accent-[var(--accent)]"
+                                  defaultChecked={post.isNotice}
+                                  name="isNotice"
+                                  type="checkbox"
+                                />
+                                공지글 유지
+                              </label>
+                            ) : null}
+                            {post.attachment ? (
+                              <label className="flex items-center gap-2 text-xs">
+                                <input
+                                  className="h-4 w-4 accent-[var(--accent)]"
+                                  name="removeAttachment"
+                                  type="checkbox"
+                                />
+                                기존 첨부 삭제
+                              </label>
+                            ) : null}
                           </div>
                           <button
-                            className="rounded-full bg-[var(--foreground)] px-4 py-2 text-xs font-semibold text-white"
+                            className="w-full rounded-full bg-[var(--foreground)] px-4 py-2.5 text-xs font-semibold text-white"
                             type="submit"
                           >
                             수정 저장
@@ -371,7 +405,7 @@ export default async function SubjectBoardPage({
                     ) : null}
                   </div>
 
-                  <div className="mt-5 rounded-[24px] border border-[var(--line)] bg-white/70 p-4">
+                  <div className="mt-4 rounded-[22px] border border-[var(--line)] bg-white/72 p-4">
                     <div className="text-sm font-semibold">
                       댓글 {post.comments.length}개
                     </div>
@@ -389,7 +423,7 @@ export default async function SubjectBoardPage({
                               key={comment.id}
                               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3"
                             >
-                              <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="text-[12px] font-semibold">
                                   {comment.user.nickname}
                                 </div>
@@ -405,7 +439,7 @@ export default async function SubjectBoardPage({
                               </p>
 
                               {canManageComment ? (
-                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <div className="mt-3 flex flex-wrap gap-2">
                                   <details className="rounded-[18px] border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-xs">
                                     <summary className="cursor-pointer list-none font-semibold">
                                       댓글 수정
@@ -432,7 +466,7 @@ export default async function SubjectBoardPage({
                                         required
                                       />
                                       <button
-                                        className="rounded-full bg-[var(--foreground)] px-4 py-2 text-xs font-semibold text-white"
+                                        className="w-full rounded-full bg-[var(--foreground)] px-4 py-2.5 text-xs font-semibold text-white"
                                         type="submit"
                                       >
                                         댓글 수정 저장
@@ -471,27 +505,59 @@ export default async function SubjectBoardPage({
                     </div>
 
                     {currentUser ? (
-                      <form action={createBoardComment} className="mt-4 space-y-3">
-                        <input name="postId" type="hidden" value={post.id} />
-                        <input
-                          name="subjectSlug"
-                          type="hidden"
-                          value={subject.slug}
-                        />
-                        <textarea
-                          className="min-h-[92px] w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
-                          maxLength={2000}
-                          name="content"
-                          placeholder="댓글 남기기"
-                          required
-                        />
-                        <button
-                          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
-                          type="submit"
+                      <>
+                        <details className="mt-4 lg:hidden">
+                          <summary className="cursor-pointer list-none rounded-full border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold">
+                            댓글 쓰기
+                          </summary>
+                          <form action={createBoardComment} className="mt-3 space-y-3">
+                            <input name="postId" type="hidden" value={post.id} />
+                            <input
+                              name="subjectSlug"
+                              type="hidden"
+                              value={subject.slug}
+                            />
+                            <textarea
+                              className="min-h-[92px] w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
+                              maxLength={2000}
+                              name="content"
+                              placeholder="댓글 남기기"
+                              required
+                            />
+                            <button
+                              className="w-full rounded-full border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold"
+                              type="submit"
+                            >
+                              댓글 등록
+                            </button>
+                          </form>
+                        </details>
+
+                        <form
+                          action={createBoardComment}
+                          className="mt-4 hidden space-y-3 lg:block"
                         >
-                          댓글 등록
-                        </button>
-                      </form>
+                          <input name="postId" type="hidden" value={post.id} />
+                          <input
+                            name="subjectSlug"
+                            type="hidden"
+                            value={subject.slug}
+                          />
+                          <textarea
+                            className="min-h-[92px] w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none"
+                            maxLength={2000}
+                            name="content"
+                            placeholder="댓글 남기기"
+                            required
+                          />
+                          <button
+                            className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
+                            type="submit"
+                          >
+                            댓글 등록
+                          </button>
+                        </form>
+                      </>
                     ) : (
                       <a
                         className="mt-4 inline-flex rounded-full bg-[#FEE500] px-4 py-3 text-sm font-semibold text-[#191600]"
@@ -505,7 +571,7 @@ export default async function SubjectBoardPage({
               );
             })
           ) : (
-            <section className="glass-panel rounded-[28px] p-8">
+            <section className="glass-panel rounded-[24px] p-6 sm:rounded-[28px] sm:p-8">
               <p className="text-sm leading-7 text-[var(--muted)]">
                 조건에 맞는 게시글이 없습니다. 검색어를 바꾸거나 공지글 필터를
                 해제해 보세요.
@@ -514,6 +580,8 @@ export default async function SubjectBoardPage({
           )}
         </section>
       </div>
+      {currentUser ? <FloatingWriteButton href="#write-post" /> : null}
+      <MobileTabBar currentPath="/boards" />
     </main>
   );
 }

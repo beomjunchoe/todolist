@@ -14,32 +14,34 @@ export function Scoreboard({
   const scoreboard = buildScoreboard(groups, userStarTotals, currentUserId);
 
   return (
-    <section className="glass-panel rounded-[28px] p-5">
-      <div className="flex items-center justify-between gap-3">
+    <section className="glass-panel rounded-[28px] p-4 sm:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
             스코어보드
           </p>
-          <h2 className="display-font mt-1 text-xl font-bold">누적 별 집계</h2>
+          <h2 className="display-font mt-1 text-lg font-bold sm:text-xl">
+            누적 별 집계
+          </h2>
         </div>
-        <p className="text-[11px] leading-5 text-[var(--muted)]">
-          할 일 하나를 한 주 동안 모두 완료할 때마다 별 1개
+        <p className="max-w-[260px] text-[11px] leading-5 text-[var(--muted)]">
+          주간 올클과 최종 완료 별이 모두 합산됩니다.
         </p>
       </div>
 
-      <div className="mt-4 max-h-[232px] space-y-3 overflow-y-auto pr-1 sm:grid sm:max-h-none sm:grid-cols-2 sm:gap-3 sm:space-y-0 sm:overflow-visible xl:grid-cols-3">
+      <div className="-mx-1 mt-4 flex snap-x gap-3 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 xl:grid-cols-3">
         {scoreboard.map((entry, index) => (
           <div
             key={entry.userId}
-            className="rounded-3xl border border-[var(--line)] bg-white/80 px-4 py-3"
+            className="min-w-[230px] snap-start rounded-3xl border border-[var(--line)] bg-white/82 px-4 py-3 sm:min-w-0"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent)]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent)]">
                   {index + 1}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold">{entry.nickname}</p>
                     {entry.isMine ? (
                       <span className="rounded-full bg-[var(--foreground)] px-2 py-1 text-[10px] font-semibold text-white">
@@ -47,8 +49,8 @@ export function Scoreboard({
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-[11px] text-[var(--muted)]">
-                    총 {entry.todoCount}개 할 일, 누적 별 {entry.stars}개
+                  <p className="text-[11px] leading-5 text-[var(--muted)]">
+                    할 일 {entry.todoCount}개 · 별 {entry.stars}개
                   </p>
                 </div>
               </div>

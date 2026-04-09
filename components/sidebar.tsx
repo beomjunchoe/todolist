@@ -16,15 +16,17 @@ export function Sidebar({
   myTodos: TodoWithChecksRecord[];
 }) {
   return (
-    <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-      <section className="glass-panel rounded-[28px] p-5">
+    <aside className="space-y-3 sm:space-y-4 lg:sticky lg:top-6 lg:self-start">
+      <section className="glass-panel rounded-[24px] p-4 sm:rounded-[28px] sm:p-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)]">
               내 투두 관리
             </p>
-            <div className="mt-2 flex items-center gap-2">
-              <h2 className="display-font text-xl font-bold">{currentUserName}</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <h2 className="display-font truncate text-lg font-bold sm:text-xl">
+                {currentUserName}
+              </h2>
               {totalStars > 0 ? <StarBadge count={totalStars} /> : null}
               {isAdmin ? <AdminBadge /> : null}
             </div>
@@ -41,11 +43,11 @@ export function Sidebar({
 
         <p className="mt-3 text-xs leading-6 text-[var(--muted)]">
           왼쪽에서 할 일을 만들고 수정합니다. 주간 체크는 오른쪽 메인 표에서
-          자기 행만 직접 누를 수 있습니다.
+          내 칸만 직접 누를 수 있습니다.
         </p>
       </section>
 
-      <section className="glass-panel rounded-[28px] p-5">
+      <section className="glass-panel rounded-[24px] p-4 sm:rounded-[28px] sm:p-5">
         <h3 className="text-sm font-semibold">할 일 추가</h3>
         <form action={createTodo} className="mt-3 space-y-3">
           <input
@@ -66,15 +68,15 @@ export function Sidebar({
             내용 공개
           </label>
           <button
-            className="w-full rounded-full bg-[var(--accent)] px-4 py-3 text-xs font-semibold text-white"
+            className="w-full rounded-full bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white"
             type="submit"
           >
-            추가
+            추가하기
           </button>
         </form>
       </section>
 
-      <section className="glass-panel rounded-[28px] p-5">
+      <section className="glass-panel rounded-[24px] p-4 sm:rounded-[28px] sm:p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">내 목록</h3>
           <span className="text-xs text-[var(--muted)]">{myTodos.length}개</span>
