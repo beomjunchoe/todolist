@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import {
   createBoardComment,
-  createBoardPost,
   deleteBoardCommentAction,
   deleteBoardPostAction,
   toggleBoardLikeAction,
@@ -11,6 +10,8 @@ import {
   updateBoardPostAction,
 } from "@/app/actions";
 import { AdminBadge } from "@/components/badges";
+import { BoardBulkDeleteForm } from "@/components/board-bulk-delete-form";
+import { BoardPostForm } from "@/components/board-post-form";
 import { FloatingWriteButton } from "@/components/floating-write-button";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { SiteNav } from "@/components/site-nav";
@@ -28,6 +29,8 @@ type PageProps = {
   }>;
 };
 
+const BULK_DELETE_FORM_ID = "bulk-delete-posts-form";
+
 function formatFileSize(bytes: number) {
   if (bytes >= 1024 * 1024) {
     return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
@@ -44,14 +47,7 @@ function getSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function BoardPostForm({
-  isAdmin,
-  subjectSlug,
-}: {
-  isAdmin: boolean;
-  subjectSlug: string;
-}) {
-  return (
+/*
     <form
       action={createBoardPost}
       className="space-y-3"
@@ -100,8 +96,7 @@ function BoardPostForm({
         게시글 올리기
       </button>
     </form>
-  );
-}
+*/
 
 export default async function SubjectBoardPage({
   params,
@@ -263,6 +258,13 @@ export default async function SubjectBoardPage({
         ) : null}
 
         <section className="space-y-3 sm:space-y-4" id="board-posts">
+          {currentUserIsAdmin ? (
+            <BoardBulkDeleteForm
+              formId={BULK_DELETE_FORM_ID}
+              subjectSlug={subject.slug}
+            />
+          ) : null}
+
           {posts.length > 0 ? (
             posts.map((post) => {
               const canManagePost =
@@ -276,6 +278,18 @@ export default async function SubjectBoardPage({
                 >
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
+                      {currentUserIsAdmin ? (
+                        <label className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)]">
+                          <input
+                            className="h-4 w-4 accent-[var(--accent)]"
+                            form={BULK_DELETE_FORM_ID}
+                            name="postIds"
+                            type="checkbox"
+                            value={post.id}
+                          />
+                          선택
+                        </label>
+                      ) : null}
                       {post.isNotice ? (
                         <span className="rounded-full bg-[rgba(236,108,47,0.12)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent)]">
                           공지

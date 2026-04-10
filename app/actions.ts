@@ -17,6 +17,7 @@ import {
   deleteClassEvent as deleteClassEventRecord,
   deleteBoardComment,
   deleteBoardPost,
+  deleteBoardPosts,
   deleteTodoItemById,
   deleteTodoItemForUser,
   toggleBoardPostLike,
@@ -67,6 +68,11 @@ function revalidateBoardPages(subjectSlug?: string) {
 function revalidateCalendarPages() {
   revalidatePath("/calendar");
 }
+
+export type CreateBoardPostState = {
+  message: string | null;
+  status: "error" | "idle" | "success";
+};
 
 export async function createTodo(formData: FormData) {
   const user = await requireSignedInUser();
@@ -155,33 +161,69 @@ export async function toggleTodoCheck(formData: FormData) {
   revalidateTodoPages();
 }
 
-export async function createBoardPost(formData: FormData) {
+export async function createBoardPost(
+  _prevState: CreateBoardPostState,
+  formData: FormData,
+): Promise<CreateBoardPostState> {
   const user = await requireSignedInUser();
   const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+  const submissionKey = `${formData.get("submissionKey") ?? ""}`.trim();
   const title = `${formData.get("title") ?? ""}`.trim();
   const content = `${formData.get("content") ?? ""}`.trim();
   const isNotice = formData.get("isNotice") === "on" && isAdminUser(user);
   const attachmentValue = formData.get("attachment");
 
-  if (!getSubjectBySlug(subjectSlug) || !title || !content) {
-    return;
+  if (!submissionKey || !getSubjectBySlug(subjectSlug) || !title || !content) {
+    return {
+      message: "제목과 내용을 확인한 뒤 다시 올려 주세요.",
+      status: "error",
+    };
   }
 
-  const attachment =
-    attachmentValue instanceof File && attachmentValue.size > 0
-      ? await saveBoardAttachment(attachmentValue)
-      : null;
+  let attachment: Awaited<ReturnType<typeof saveBoardAttachment>> = null;
 
-  createBoardPostRecord({
-    attachment,
-    content: content.slice(0, 4000),
-    isNotice,
-    subjectSlug,
-    title: title.slice(0, 100),
-    userId: user.id,
-  });
+  try {
+    attachment =
+      attachmentValue instanceof File && attachmentValue.size > 0
+        ? await saveBoardAttachment(attachmentValue)
+        : null;
 
-  revalidateBoardPages(subjectSlug);
+    const result = createBoardPostRecord({
+      attachment,
+      content: content.slice(0, 4000),
+      isNotice,
+      subjectSlug,
+      submissionKey,
+      title: title.slice(0, 100),
+      userId: user.id,
+    });
+
+    if (result.status === "duplicate" && attachment) {
+      await deleteBoardAttachment(attachment.filePath);
+    }
+
+    revalidateBoardPages(subjectSlug);
+
+    return {
+      message:
+        result.status === "duplicate"
+          ? "같은 업로드 요청이 이미 처리되어 중복 저장하지 않았습니다."
+          : "게시글을 올렸습니다.",
+      status: "success",
+    };
+  } catch (error) {
+    if (attachment) {
+      await deleteBoardAttachment(attachment.filePath);
+    }
+
+    return {
+      message:
+        error instanceof Error
+          ? error.message
+          : "게시글을 올리지 못했습니다. 다시 시도해 주세요.",
+      status: "error",
+    };
+  }
 }
 
 export async function updateBoardPostAction(formData: FormData) {
@@ -244,6 +286,35 @@ export async function deleteBoardPostAction(formData: FormData) {
   if (result?.attachmentPath) {
     await deleteBoardAttachment(result.attachmentPath);
   }
+
+  revalidateBoardPages(subjectSlug);
+}
+
+export async function deleteBoardPostsAction(formData: FormData) {
+  const user = await requireAdminUser();
+  const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
+  const postIds = formData
+    .getAll("postIds")
+    .map((value) => `${value ?? ""}`.trim())
+    .filter(Boolean);
+
+  if (!getSubjectBySlug(subjectSlug) || postIds.length === 0) {
+    return;
+  }
+
+  const deletedPosts = deleteBoardPosts({
+    actorUserId: user.id,
+    isAdmin: isAdminUser(user),
+    postIds,
+    subjectSlug,
+  });
+
+  await Promise.all(
+    deletedPosts
+      .map((post) => post.attachmentPath)
+      .filter((path): path is string => Boolean(path))
+      .map((path) => deleteBoardAttachment(path)),
+  );
 
   revalidateBoardPages(subjectSlug);
 }

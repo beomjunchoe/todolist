@@ -208,6 +208,18 @@ function createDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS board_post_submissions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      subject_slug TEXT NOT NULL,
+      submission_key TEXT NOT NULL,
+      post_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (user_id, submission_key),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (post_id) REFERENCES board_posts(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS board_post_likes (
       id TEXT PRIMARY KEY,
       post_id TEXT NOT NULL,
@@ -584,6 +596,7 @@ export function toggleTodoCheckForUser(
 export function createBoardPost(input: {
   userId: string;
   subjectSlug: string;
+  submissionKey: string;
   title: string;
   content: string;
   isNotice: boolean;
@@ -596,39 +609,99 @@ export function createBoardPost(input: {
 }) {
   const db = getDatabase();
   const now = new Date().toISOString();
+  const postId = randomUUID();
 
-  db.prepare(
-    `
-      INSERT INTO board_posts (
-        id,
-        subject_slug,
-        user_id,
-        title,
-        content,
-        is_notice,
-        attachment_name,
-        attachment_path,
-        attachment_mime,
-        attachment_size,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-  ).run(
-    randomUUID(),
-    input.subjectSlug,
-    input.userId,
-    input.title,
-    input.content,
-    input.isNotice ? 1 : 0,
-    input.attachment?.fileName ?? null,
-    input.attachment?.filePath ?? null,
-    input.attachment?.mimeType ?? null,
-    input.attachment?.fileSize ?? null,
-    now,
-    now,
-  );
+  const insertBoardPost = db.transaction(() => {
+    db.prepare(
+      `
+        INSERT INTO board_posts (
+          id,
+          subject_slug,
+          user_id,
+          title,
+          content,
+          is_notice,
+          attachment_name,
+          attachment_path,
+          attachment_mime,
+          attachment_size,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    ).run(
+      postId,
+      input.subjectSlug,
+      input.userId,
+      input.title,
+      input.content,
+      input.isNotice ? 1 : 0,
+      input.attachment?.fileName ?? null,
+      input.attachment?.filePath ?? null,
+      input.attachment?.mimeType ?? null,
+      input.attachment?.fileSize ?? null,
+      now,
+      now,
+    );
+
+    db.prepare(
+      `
+        INSERT INTO board_post_submissions (
+          id,
+          user_id,
+          subject_slug,
+          submission_key,
+          post_id,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+    ).run(
+      randomUUID(),
+      input.userId,
+      input.subjectSlug,
+      input.submissionKey,
+      postId,
+      now,
+    );
+  });
+
+  try {
+    insertBoardPost();
+
+    return {
+      postId,
+      status: "created" as const,
+    };
+  } catch (error) {
+    const sqliteError = error as { code?: string };
+
+    if (sqliteError.code?.startsWith("SQLITE_CONSTRAINT")) {
+      const existingSubmission = db
+        .prepare(
+          `
+            SELECT post_id
+            FROM board_post_submissions
+            WHERE user_id = ? AND submission_key = ?
+          `,
+        )
+        .get(input.userId, input.submissionKey) as
+        | {
+            post_id: string;
+          }
+        | undefined;
+
+      if (existingSubmission) {
+        return {
+          postId: existingSubmission.post_id,
+          status: "duplicate" as const,
+        };
+      }
+    }
+
+    throw error;
+  }
 }
 
 function getBoardPostPermissionRecord(postId: string) {
@@ -742,6 +815,57 @@ export function deleteBoardPost(input: {
     attachmentPath: post.attachmentPath,
     subjectSlug: post.subjectSlug,
   };
+}
+
+export function deleteBoardPosts(input: {
+  actorUserId: string;
+  isAdmin: boolean;
+  postIds: string[];
+  subjectSlug: string;
+}) {
+  const db = getDatabase();
+  const uniquePostIds = [...new Set(input.postIds.filter(Boolean))];
+
+  if (uniquePostIds.length === 0) {
+    return [];
+  }
+
+  const posts = db
+    .prepare(
+      `
+        SELECT id, user_id, subject_slug, attachment_path
+        FROM board_posts
+        WHERE subject_slug = ?
+          AND id IN (${uniquePostIds.map(() => "?").join(", ")})
+      `,
+    )
+    .all(input.subjectSlug, ...uniquePostIds) as Array<{
+    attachment_path: string | null;
+    id: string;
+    subject_slug: string;
+    user_id: string;
+  }>;
+
+  const deletablePosts = input.isAdmin
+    ? posts
+    : posts.filter((post) => post.user_id === input.actorUserId);
+
+  if (deletablePosts.length === 0) {
+    return [];
+  }
+
+  db.prepare(
+    `
+      DELETE FROM board_posts
+      WHERE id IN (${deletablePosts.map(() => "?").join(", ")})
+    `,
+  ).run(...deletablePosts.map((post) => post.id));
+
+  return deletablePosts.map((post) => ({
+    attachmentPath: post.attachment_path,
+    postId: post.id,
+    subjectSlug: post.subject_slug,
+  }));
 }
 
 export function createBoardComment(input: {
