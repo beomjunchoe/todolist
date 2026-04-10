@@ -258,9 +258,10 @@ export default async function SubjectBoardPage({
         ) : null}
 
         <section className="space-y-3 sm:space-y-4" id="board-posts">
-          {currentUserIsAdmin ? (
+          {currentUser ? (
             <BoardBulkDeleteForm
               formId={BULK_DELETE_FORM_ID}
+              isAdmin={currentUserIsAdmin}
               subjectSlug={subject.slug}
             />
           ) : null}
@@ -278,7 +279,7 @@ export default async function SubjectBoardPage({
                 >
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      {currentUserIsAdmin ? (
+                      {canManagePost ? (
                         <label className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)]">
                           <input
                             className="h-4 w-4 accent-[var(--accent)]"

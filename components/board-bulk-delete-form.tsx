@@ -7,6 +7,7 @@ import { deleteBoardPostsAction } from "@/app/actions";
 
 type BoardBulkDeleteFormProps = {
   formId: string;
+  isAdmin: boolean;
   subjectSlug: string;
 };
 
@@ -34,6 +35,7 @@ function DeleteButton({ selectedCount }: { selectedCount: number }) {
 
 export function BoardBulkDeleteForm({
   formId,
+  isAdmin,
   subjectSlug,
 }: BoardBulkDeleteFormProps) {
   const [selectedCount, setSelectedCount] = useState(0);
@@ -94,7 +96,9 @@ export function BoardBulkDeleteForm({
             게시글 관리
           </p>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            체크한 글을 한 번에 삭제합니다.
+            {isAdmin
+              ? "체크한 글을 한 번에 삭제합니다."
+              : "내가 쓴 글만 체크해서 한 번에 삭제합니다."}
           </p>
         </div>
 
