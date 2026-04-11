@@ -12,9 +12,11 @@ type RouteProps = {
   }>;
 };
 
-export async function GET(_: Request, { params }: RouteProps) {
+export async function GET(request: Request, { params }: RouteProps) {
   const { postId } = await params;
   const attachment = getBoardAttachmentById(postId);
+  const shouldDownload =
+    new URL(request.url).searchParams.get("download") === "1";
 
   if (!attachment) {
     return new NextResponse("Not found", { status: 404 });
@@ -28,7 +30,7 @@ export async function GET(_: Request, { params }: RouteProps) {
 
   return new NextResponse(Readable.toWeb(createReadStream(attachment.filePath)) as ReadableStream, {
     headers: {
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(
+      "Content-Disposition": `${shouldDownload ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(
         attachment.fileName,
       )}`,
       "Content-Length": String(attachment.fileSize),

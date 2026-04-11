@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -45,6 +46,10 @@ function formatFileSize(bytes: number) {
 
 function getSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function isInlinePreviewableAttachment(mimeType: string) {
+  return mimeType.startsWith("image/") || mimeType === "application/pdf";
 }
 
 /*
@@ -312,6 +317,28 @@ export default async function SubjectBoardPage({
                     <p className="whitespace-pre-wrap text-sm leading-7">
                       {post.content}
                     </p>
+
+                    {post.attachment &&
+                    isInlinePreviewableAttachment(post.attachment.mimeType) ? (
+                      <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
+                        {post.attachment.mimeType.startsWith("image/") ? (
+                          <Image
+                            alt={post.attachment.fileName}
+                            className="max-h-[520px] w-full object-contain"
+                            height={520}
+                            src={`/api/board-files/${post.id}`}
+                            unoptimized
+                            width={920}
+                          />
+                        ) : (
+                          <iframe
+                            className="h-[520px] w-full"
+                            src={`/api/board-files/${post.id}`}
+                            title={post.attachment.fileName}
+                          />
+                        )}
+                      </div>
+                    ) : null}
 
                     {post.attachment ? (
                       <a
