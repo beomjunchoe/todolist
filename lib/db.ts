@@ -59,6 +59,18 @@ export type BoardPostRecord = {
   comments: BoardCommentRecord[];
 };
 
+export type BoardSubjectSummaryRecord = {
+  latestPost: {
+    createdAt: string;
+    id: string;
+    isNotice: boolean;
+    title: string;
+    user: Pick<DbUser, "nickname">;
+  } | null;
+  postCount: number;
+  subjectSlug: string;
+};
+
 export type ClassEventRecord = {
   id: string;
   title: string;
@@ -1597,6 +1609,72 @@ export function listBoardPostsBySubject(
       nickname: post.nickname,
     },
   }));
+}
+
+export function listBoardSubjectSummaries(): BoardSubjectSummaryRecord[] {
+  const db = getDatabase();
+  const counts = db
+    .prepare(
+      `
+        SELECT subject_slug, COUNT(*) AS post_count
+        FROM board_posts
+        GROUP BY subject_slug
+      `,
+    )
+    .all() as {
+    post_count: number;
+    subject_slug: string;
+  }[];
+
+  if (counts.length === 0) {
+    return [];
+  }
+
+  const latestPostStatement = db.prepare(
+    `
+      SELECT
+        board_posts.id,
+        board_posts.subject_slug,
+        board_posts.title,
+        board_posts.is_notice,
+        board_posts.created_at,
+        users.nickname
+      FROM board_posts
+      INNER JOIN users ON users.id = board_posts.user_id
+      WHERE board_posts.subject_slug = ?
+      ORDER BY board_posts.is_notice DESC, board_posts.created_at DESC
+      LIMIT 1
+    `,
+  );
+
+  return counts.map((count) => {
+    const latestPost = latestPostStatement.get(count.subject_slug) as
+      | {
+          created_at: string;
+          id: string;
+          is_notice: number;
+          nickname: string;
+          subject_slug: string;
+          title: string;
+        }
+      | undefined;
+
+    return {
+      latestPost: latestPost
+        ? {
+            createdAt: latestPost.created_at,
+            id: latestPost.id,
+            isNotice: Boolean(latestPost.is_notice),
+            title: latestPost.title,
+            user: {
+              nickname: latestPost.nickname,
+            },
+          }
+        : null,
+      postCount: count.post_count,
+      subjectSlug: count.subject_slug,
+    };
+  });
 }
 
 export function getBoardAttachmentById(postId: string) {
