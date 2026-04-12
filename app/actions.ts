@@ -291,7 +291,7 @@ export async function deleteBoardPostAction(formData: FormData) {
 }
 
 export async function deleteBoardPostsAction(formData: FormData) {
-  const user = await requireAdminUser();
+  const user = await requireSignedInUser();
   const subjectSlug = `${formData.get("subjectSlug") ?? ""}`.trim();
   const postIds = formData
     .getAll("postIds")
